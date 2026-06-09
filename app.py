@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 하나의 레이아웃 내부에서 PC(좌우) / 모바일(상하 + 명단 수평 4열)을 구현하는 핵심 CSS
+# 2. PC(좌우) / 모바일(상하 + 명단 수평 4열 강제 고정) 및 콤팩트 화면 레이아웃 CSS 주입
 st.markdown("""
     <style>
     /* 상단 타이틀 메뉴 바 잘림 방지 및 기본 여백 최적화 */
@@ -60,13 +60,13 @@ st.markdown("""
 
     /* 📱 [모바일폰 환경 전용 스타일: 너비 799px 이하] -> 상하 레이아웃 및 4열 강제 고정 */
     @media (max-width: 799px) {
-        /* 1. Streamlit의 좌우 컬럼 분할을 강제로 상하 적층(수직) 구도로 전환 */
+        /* Streamlit의 좌우 컬럼 분할을 강제로 상하 적층(수직) 구도로 전환 */
         [data-testid="stHorizontalBlock"] {
             flex-direction: column !important;
             gap: 1.5rem !important;
         }
         
-        /* 2. 명단 버튼들이 포함된 첫 번째 블록(명단 컨테이너)을 가로 수평 4열 격자로 강제 유지 */
+        /* 명단 버튼들이 포함된 첫 번째 블록(명단 컨테이너)을 가로 수평 4열 격자로 강제 유지 */
         [data-testid="stHorizontalBlock"] > div:first-child [data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
@@ -147,7 +147,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 데이터 로드 함수 (명단.xlsx 지원)
+# 3. 데이터 로드 함수 (명단.xlsx)
 def load_initial_members():
     file_name = "명단.xlsx"
     if os.path.exists(file_name):
@@ -160,15 +160,21 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 좌석배치.xlsx 구조 분석 함수
+# 4. 💡 좌석배치.xlsx 파일에서 구조 분석 및 '가장 우측 열 제외' 필터링 처리 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
         try:
             df = pd.read_excel(file_name, header=None)
             df = df.fillna("")
+            
+            # 버전에 따른 텍스트 양 끝 공백 일괄 정리
             df = df.map(lambda x: str(x).strip()) if hasattr(df, 'map') else df.applymap(lambda x: str(x).strip())
             
+            # ⭐ [핵심 요구사항 반영]: 데이터프레임의 가장 우측 열을 완전히 잘라냅니다 (Drop Last Column)
+            if len(df.columns) > 0:
+                df = df.iloc[:, :-1]
+                
             seats = []
             for row in df.values:
                 for val in row:
@@ -178,15 +184,16 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
+    # 파일이 없을 경우 작동할 기본 A~S 매핑 백업 레이아웃 (가장 우측열 제외 규격)
     backup_data = [
-        ["A", "B", "C", "", "D", "E", "F"],
-        ["", "", "", "", "", "", ""],         
-        ["", "G", "H", "", "I", "J", "K"],
-        ["L", "M", "N", "", "O", "P", "Q"],
-        ["", "", "", "", "", "", ""],         
-        ["R", "S", "T", "", "U", "V", "W"]
+        ["A", "B", "C", "", "D", "E"],
+        ["", "", "", "", "", ""],         
+        ["", "F", "G", "", "H", "I"],
+        ["J", "K", "L", "", "M", "N"],
+        ["", "", "", "", "", ""],         
+        ["O", "P", "Q", "", "R", "S"]
     ]
-    return pd.DataFrame(backup_data), ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W"]
+    return pd.DataFrame(backup_data), ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S"]
 
 # 5. 세션 관리 및 데이터 초기 마운트
 layout_df, available_seats_list = load_excel_layout()
@@ -224,21 +231,15 @@ with btn_col:
 
 st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
-
 # ------------------------------------------------------------------
 # 단일 통합 레이아웃 가동 (PC: 좌우 자동 / 모바일: 상하 자동 전환)
 # ------------------------------------------------------------------
-# left_col과 right_col이 PC에서는 1:2.5 비율의 좌우 배치로 서빙되며,
-# 모바일 브라우저로 진입하는 순간 CSS 미디어 쿼리가 이를 감지하여 유연하게 상하(수직)로 재정렬시킵니다.
 left_col, right_col = st.columns([1, 2.5])
 
 # [명단 영역]
 with left_col:
     st.markdown("<div class='section-title'>👥 명단</div>", unsafe_allow_html=True)
     if st.session_state.members:
-        # 가로 4열 구조로 버튼을 그립니다.
-        # PC(넓은 화면): 좌측폭이 좁아 가로로 나열되다 2열씩 이쁘게 줄바꿈되어 2X9에 가깝게 정착합니다.
-        # 모바일(좁은 화면): 아래 주입된 Flex CSS에 의해 꺾이지 않고 가로 수평 4열(4X5 격자)을 칼같이 고정 유지합니다.
         grid_cols = st.columns(4)
         for idx, name in enumerate(st.session_state.members):
             col_target = grid_cols[idx % 4]
@@ -247,7 +248,7 @@ with left_col:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [좌석 별 배치 영역]
+# [좌석 별 배치 영역] - 우측 마지막 열이 탈락되어 더욱 가로 밸런스가 깔끔해집니다.
 with right_col:
     st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
     

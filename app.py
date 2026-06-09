@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import random
 import os
+from PIL import Image, ImageDraw, ImageFont
+import io
 
 # 1. 화면 최적화 및 레이아웃 기본 설정
 st.set_page_config(
@@ -243,6 +245,92 @@ def reset_program():
     st.session_state.available_seats = fresh_seats
     st.rerun()
 
+# 💡 [결과 이미지 생성 함수] 현재 좌석 배치 상태를 PIL 이미지로 렌더링하여 JPG 바이트로 반환
+def generate_seat_image(df, assignments):
+    cell_w, cell_h = 140, 90
+    margin = 15
+    rows, cols = df.shape
+    img_w = cols * cell_w + margin * 2
+    img_h = rows * cell_h + margin * 2
+    
+    # 이미지 도화지 생성 (흰색 배경)
+    img = Image.new("RGB", (img_w, img_h), "#FFFFFF")
+    draw = ImageDraw.Draw(img)
+    
+    # 폰트 로드 시도 (윈도우/리눅스/맥 기본 한글 폰트 대응 백업 체계)
+    font_paths = [
+        "C:/Windows/Fonts/malgun.ttf", # Windows
+        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", # Linux
+        "/System/Library/Fonts/Supplemental/AppleGothic.ttf" # Mac
+    ]
+    font_main = None
+    font_sub = None
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                font_main = ImageFont.truetype(path, 15)
+                font_sub = ImageFont.truetype(path, 11)
+                break
+            except:
+                pass
+    if font_main is None:
+        font_main = ImageFont.load_default()
+        font_sub = ImageFont.load_default()
+
+    for r_idx, row in df.iterrows():
+        is_empty_row = all(cell_value == "" for cell_value in row)
+        if is_empty_row:
+            continue # 빈 줄(가로 통로)은 패스
+            
+        for c_idx, cell_value in enumerate(row):
+            x1 = margin + c_idx * cell_w + 6
+            y1 = margin + r_idx * cell_h + 6
+            x2 = x1 + cell_w - 12
+            y2 = y1 + cell_h - 12
+            
+            if cell_value == "X":
+                # 기둥/구조물: 테두리가 있는 검은색 박스
+                draw.rounded_rectangle([x1, y1, x2, y2], radius=8, fill="#1E293B", outline="#475569", width=1)
+            elif cell_value == "":
+                # 세로 통로: 투명 (그리지 않음)
+                continue
+            else:
+                # 일반 좌석 영역
+                assigned_user = assignments.get(cell_value, None)
+                if assigned_user:
+                    # 배정된 경우: 초록색 뱃지 테두리 형태 구현
+                    draw.rounded_rectangle([x1, y1, x2, y2], radius=8, fill="#F8F9FA", outline="#E0E0E0", width=1)
+                    # 이름표 녹색 뱃지 박스
+                    bx1, by1 = x1 + 10, y1 + 15
+                    bx2, by2 = x2 - 10, y1 + 45
+                    draw.rounded_rectangle([bx1, by1, bx2, by2], radius=4, fill="#2ECC71", outline="#27AE60", width=1)
+                    
+                    # 텍스트 중앙 정렬 계산 및 드로잉
+                    tw = draw.textlength(assigned_user, font=font_main)
+                    tx = bx1 + (bx2 - bx1 - tw) / 2
+                    ty = by1 + (by2 - by1 - 18) / 2
+                    draw.text((tx, ty), assigned_user, fill="#FFFFFF", font=font_main)
+                    
+                    # 좌석 기호 텍스트
+                    lbl = f"좌석 {cell_value}"
+                    lw = draw.textlength(lbl, font=font_sub)
+                    lx = x1 + (cell_w - 12 - lw) / 2
+                    ly = y2 - 25
+                    draw.text((lx, ly), lbl, fill="#A0A0A0", font=font_sub)
+                else:
+                    # 미배정 좌석
+                    draw.rounded_rectangle([x1, y1, x2, y2], radius=8, fill="#F8F9FA", outline="#E0E0E0", width=1)
+                    tw = draw.textlength(cell_value, font=font_main)
+                    tx = x1 + (cell_w - 12 - tw) / 2
+                    ty = y1 + (cell_h - 12 - 18) / 2
+                    draw.text((tx, ty), cell_value, fill="#BCBCBC", font=font_main)
+                    
+    # 바이트 스트림으로 변환 후 반환
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='JPEG', quality=95)
+    return img_byte_arr.getvalue()
+
+
 # ------------------------------------------------------------------
 # 상단 글로벌 제어바 헤더
 # ------------------------------------------------------------------
@@ -280,11 +368,9 @@ with left_col:
 
 # [좌석 배치 영역]
 with right_col:
-    # 💡 요청하신 대로 제목을 '🪑 좌석 별 배치'에서 '🪑 좌석 배치'로 변경했습니다.
     st.markdown("<div class='section-title'>🪑 좌석 배치</div>", unsafe_allow_html=True)
     
     html_table = "<table class='seat-table'>"
-    
     for r_idx, row in layout_df.iterrows():
         is_empty_row = all(cell_value == "" for cell_value in row)
         
@@ -315,3 +401,18 @@ with right_col:
     html_table += "</table>"
     
     st.markdown(html_table, unsafe_allow_html=True)
+    
+    # 💡 [요구사항 반영] 좌석 배치도 그림 바로 하단에 '결과저장' 버튼 구현 (JPG 이미지 파일 다운로드 링크 연동)
+    st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
+    
+    # 현재 좌석 매핑 현황 데이터를 기반으로 바이너리 JPG 파일 스트림 생성
+    jpg_image_bytes = generate_seat_image(layout_df, st.session_state.assignments)
+    
+    # Streamlit의 단정하고 일관된 다운로드 버튼 컴포넌트 마운트
+    st.download_button(
+        label="💾 결과저장 (JPG 이미지 다운로드)",
+        data=jpg_image_bytes,
+        file_name="Security솔루션팀_좌석배치결과.jpg",
+        mime="image/jpeg",
+        use_container_width=True
+    )

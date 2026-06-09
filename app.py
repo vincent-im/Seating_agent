@@ -117,7 +117,7 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 💡 엑셀 내 X 표시 셀 전용 서식 (테두리가 있는 선명한 검은색 박스) */
+    /* 엑셀 내 X 표시 셀 전용 서식 (테두리가 있는 선명한 검은색 박스) */
     .black-pillar-space {
         border: 1px solid #475569 !important;
         background-color: #1E293B !important;
@@ -165,7 +165,7 @@ def load_initial_members():
         try:
             df = pd.read_excel(file_name)
             names = df.iloc[:, 0].dropna().astype(str).tolist()
-            return [name.strip() for name in names if name.strip()]
+            return [f"{name.strip()}(팀장)" if "김광녕" in name else name.strip() for name in names if name.strip()]
         except:
             pass
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
@@ -191,7 +191,7 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 동기화된 안전한 백업 도면 사양
+    # 백업 도면 사양
     backup_data = [
         ["A", "B", "C", "", "D", "E", "X"],
         ["", "", "", "", "", "", ""],         
@@ -221,7 +221,7 @@ def assign_seat(name):
         st.session_state.members.remove(name)
         st.rerun()
 
-# 💡 명단 순서를 무작위로 뒤섞는 리셔플링 함수
+# 명단 순서를 무작위로 뒤섞는 리셔플링 함수
 def shuffle_members():
     random.shuffle(st.session_state.members)
     st.rerun()
@@ -253,7 +253,6 @@ left_col, right_col = st.columns([1, 2.5])
 with left_col:
     st.markdown("<div class='section-title'>👥 명단</div>", unsafe_allow_html=True)
     
-    # 💡 명단 섹션 바로 아래에 리셔플링 제어 버튼 배치
     if st.session_state.members:
         st.markdown("<div class='custom-control-btn'>", unsafe_allow_html=True)
         if st.button("🔄 명단 리셔플링", key="shuffle_btn", use_container_width=True):

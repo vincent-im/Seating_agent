@@ -147,7 +147,7 @@ st.markdown("""
         display: inline-block;
         white-space: nowrap;
     }
-    .name-leader { background-color: #FFEB3B !important; color: #E65100 !important; border: 1.5px solid #E65100 !important; }
+    /* 💡 모든 팀원의 이름표 색상을 동일한 녹색 스타일로 단일화 */
     .name-member { background-color: #2ECC71 !important; color: #FFFFFF !important; border: 1px solid #27AE60 !important; }
     
     .seat-label {
@@ -163,7 +163,6 @@ def load_initial_members():
     file_name = "명단.xlsx"
     if os.path.exists(file_name):
         try:
-            # 첫 번째 행이 헤더로 유실되는 것을 막기 위해 header=None으로 먼저 읽거나 처리
             df = pd.read_excel(file_name, header=None)
             names = []
             for col in df.columns:
@@ -171,7 +170,6 @@ def load_initial_members():
             
             cleaned_names = [n.strip() for n in names if n.strip() and n.strip() != "nan"]
             
-            # '김광녕' 유실 방지 검증: 만약 엑셀을 읽었는데 '김광녕'이 없다면 강제로 최상단에 추가
             if "김광녕" not in cleaned_names:
                 cleaned_names.insert(0, "김광녕")
                 
@@ -179,7 +177,6 @@ def load_initial_members():
         except:
             pass
             
-    # 백업 리스트 보정
     return ["김광녕", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
@@ -203,7 +200,6 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 백업 도면 사양
     backup_data = [
         ["A", "B", "C", "", "D", "E", "X"],
         ["", "", "", "", "", "", ""],         
@@ -217,9 +213,6 @@ def load_excel_layout():
 
 # 5. 세션 관리 및 데이터 초기 마운트
 layout_df, available_seats_list = load_excel_layout()
-
-# 엑셀 파일이 수정되었을 때 세션이 구버전 데이터를 쥐고 있는 문제를 해결하기 위해
-# '전체 초기화'를 하지 않더라도 강제로 초기 로드 리스트에 반영되도록 로직 보완
 initial_members_list = load_initial_members()
 
 if 'members' not in st.session_state:
@@ -229,7 +222,6 @@ if 'assignments' not in st.session_state:
 if 'available_seats' not in st.session_state:
     st.session_state.available_seats = available_seats_list.copy()
 
-# 혹시 세션 상태에 '김광녕'이 누락되어 있다면 강제로 주입 (세션 브레이커 방어 코드)
 if st.session_state.members and "김광녕" not in st.session_state.members and not any("김광녕" in k or v == "김광녕" for k, v in st.session_state.assignments.items()):
     st.session_state.members.insert(0, "김광녕")
 
@@ -241,7 +233,6 @@ def assign_seat(name):
         st.session_state.members.remove(name)
         st.rerun()
 
-# 명단 순서를 무작위로 뒤섞는 리셔플링 함수
 def shuffle_members():
     random.shuffle(st.session_state.members)
     st.rerun()
@@ -310,8 +301,8 @@ with right_col:
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"
                 if assigned_user:
-                    # '김광녕'인 경우 노란색 강조 스타일(name-leader) 지정
-                    style_class = "name-leader" if "김광녕" in assigned_user else "name-member"
+                    # 💡 조건 구문을 제거하여 '김광녕' 포함 모든 팀원이 'name-member' 녹색 스타일을 갖도록 일괄 변경
+                    style_class = "name-member"
                     html_table += f"""
                     <div class='seat-slot-assigned'>
                         <span class='name-badge {style_class}'>{assigned_user}</span>

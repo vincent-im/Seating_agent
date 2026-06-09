@@ -4,6 +4,7 @@ import random
 import os
 from PIL import Image, ImageDraw, ImageFont
 import io
+import urllib.request
 
 # 1. 화면 최적화 및 레이아웃 기본 설정
 st.set_page_config(
@@ -245,7 +246,32 @@ def reset_program():
     st.session_state.available_seats = fresh_seats
     st.rerun()
 
-# 💡 [결과 이미지 생성 함수] 현재 좌석 배치 상태를 PIL 이미지로 렌더링하여 JPG 바이트로 반환
+# 💡 [한글 깨짐 해결용 폰트 다운로드 함수]
+@st.cache_resource
+def get_hangul_font():
+    # 파일이 동작하는 환경에 한글 폰트가 없으면 나눔고딕 웹 폰트를 다운로드해서 사용하도록 안전 조치합니다.
+    font_filename = "NanumGothicBold.ttf"
+    if not os.path.exists(font_filename):
+        try:
+            url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Bold.ttf"
+            urllib.request.urlretrieve(url, font_filename)
+        except:
+            pass
+            
+    # 우선순위별 시스템 한글 폰트 목록 탐색
+    font_paths = [
+        font_filename, # 다운로드한 폰트
+        "C:/Windows/Fonts/malgun.ttf", # Windows 맑은고딕
+        "C:/Windows/Fonts/malgunbd.ttf", # Windows 맑은고딕 Bold
+        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", # Linux 나눔고딕
+        "/System/Library/Fonts/Supplemental/AppleGothic.ttf" # Mac 애플고딕
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            return path
+    return None
+
+# 결과 이미지 생성 함수 (한글 고도화 대응)
 def generate_seat_image(df, assignments):
     cell_w, cell_h = 140, 90
     margin = 15
@@ -253,34 +279,23 @@ def generate_seat_image(df, assignments):
     img_w = cols * cell_w + margin * 2
     img_h = rows * cell_h + margin * 2
     
-    # 이미지 도화지 생성 (흰색 배경)
     img = Image.new("RGB", (img_w, img_h), "#FFFFFF")
     draw = ImageDraw.Draw(img)
     
-    # 폰트 로드 시도 (윈도우/리눅스/맥 기본 한글 폰트 대응 백업 체계)
-    font_paths = [
-        "C:/Windows/Fonts/malgun.ttf", # Windows
-        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", # Linux
-        "/System/Library/Fonts/Supplemental/AppleGothic.ttf" # Mac
-    ]
-    font_main = None
-    font_sub = None
-    for path in font_paths:
-        if os.path.exists(path):
-            try:
-                font_main = ImageFont.truetype(path, 15)
-                font_sub = ImageFont.truetype(path, 11)
-                break
-            except:
-                pass
-    if font_main is None:
+    # 확실하게 한정된 한글 폰트 경로 로드
+    font_path = get_hangul_font()
+    
+    if font_path:
+        font_main = ImageFont.truetype(font_path, 15)
+        font_sub = ImageFont.truetype(font_path, 11)
+    else:
         font_main = ImageFont.load_default()
         font_sub = ImageFont.load_default()
 
     for r_idx, row in df.iterrows():
         is_empty_row = all(cell_value == "" for cell_value in row)
         if is_empty_row:
-            continue # 빈 줄(가로 통로)은 패스
+            continue
             
         for c_idx, cell_value in enumerate(row):
             x1 = margin + c_idx * cell_w + 6
@@ -289,43 +304,53 @@ def generate_seat_image(df, assignments):
             y2 = y1 + cell_h - 12
             
             if cell_value == "X":
-                # 기둥/구조물: 테두리가 있는 검은색 박스
                 draw.rounded_rectangle([x1, y1, x2, y2], radius=8, fill="#1E293B", outline="#475569", width=1)
             elif cell_value == "":
-                # 세로 통로: 투명 (그리지 않음)
                 continue
             else:
-                # 일반 좌석 영역
                 assigned_user = assignments.get(cell_value, None)
                 if assigned_user:
-                    # 배정된 경우: 초록색 뱃지 테두리 형태 구현
                     draw.rounded_rectangle([x1, y1, x2, y2], radius=8, fill="#F8F9FA", outline="#E0E0E0", width=1)
-                    # 이름표 녹색 뱃지 박스
                     bx1, by1 = x1 + 10, y1 + 15
                     bx2, by2 = x2 - 10, y1 + 45
                     draw.rounded_rectangle([bx1, by1, bx2, by2], radius=4, fill="#2ECC71", outline="#27AE60", width=1)
                     
-                    # 텍스트 중앙 정렬 계산 및 드로잉
-                    tw = draw.textlength(assigned_user, font=font_main)
+                    # 텍스트 길이 측정 방식 고도화
+                    try:
+                        bbox = draw.textbbox((0, 0), assigned_user, font=font_main)
+                        tw = bbox[2] - bbox[0]
+                        th = bbox[3] - bbox[1]
+                    except:
+                        tw = draw.textlength(assigned_user, font=font_main)
+                        th = 15
+                        
                     tx = bx1 + (bx2 - bx1 - tw) / 2
-                    ty = by1 + (by2 - by1 - 18) / 2
+                    ty = by1 + (by2 - by1 - th) / 2 - 1
                     draw.text((tx, ty), assigned_user, fill="#FFFFFF", font=font_main)
                     
-                    # 좌석 기호 텍스트
                     lbl = f"좌석 {cell_value}"
-                    lw = draw.textlength(lbl, font=font_sub)
+                    try:
+                        s_bbox = draw.textbbox((0, 0), lbl, font=font_sub)
+                        lw = s_bbox[2] - s_bbox[0]
+                    except:
+                        lw = draw.textlength(lbl, font=font_sub)
+                        
                     lx = x1 + (cell_w - 12 - lw) / 2
                     ly = y2 - 25
                     draw.text((lx, ly), lbl, fill="#A0A0A0", font=font_sub)
                 else:
-                    # 미배정 좌석
                     draw.rounded_rectangle([x1, y1, x2, y2], radius=8, fill="#F8F9FA", outline="#E0E0E0", width=1)
-                    tw = draw.textlength(cell_value, font=font_main)
+                    try:
+                        bbox = draw.textbbox((0, 0), cell_value, font=font_main)
+                        tw = bbox[2] - bbox[0]
+                        th = bbox[3] - bbox[1]
+                    except:
+                        tw = draw.textlength(cell_value, font=font_main)
+                        th = 15
                     tx = x1 + (cell_w - 12 - tw) / 2
-                    ty = y1 + (cell_h - 12 - 18) / 2
+                    ty = y1 + (cell_h - 12 - th) / 2
                     draw.text((tx, ty), cell_value, fill="#BCBCBC", font=font_main)
                     
-    # 바이트 스트림으로 변환 후 반환
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG', quality=95)
     return img_byte_arr.getvalue()
@@ -402,13 +427,10 @@ with right_col:
     
     st.markdown(html_table, unsafe_allow_html=True)
     
-    # 💡 [요구사항 반영] 좌석 배치도 그림 바로 하단에 '결과저장' 버튼 구현 (JPG 이미지 파일 다운로드 링크 연동)
     st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
     
-    # 현재 좌석 매핑 현황 데이터를 기반으로 바이너리 JPG 파일 스트림 생성
     jpg_image_bytes = generate_seat_image(layout_df, st.session_state.assignments)
     
-    # Streamlit의 단정하고 일관된 다운로드 버튼 컴포넌트 마운트
     st.download_button(
         label="💾 결과저장 (JPG 이미지 다운로드)",
         data=jpg_image_bytes,

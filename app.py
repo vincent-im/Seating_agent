@@ -246,10 +246,9 @@ def reset_program():
     st.session_state.available_seats = fresh_seats
     st.rerun()
 
-# 💡 [한글 깨짐 해결용 폰트 다운로드 함수]
+# [한글 깨짐 해결용 폰트 다운로드 함수]
 @st.cache_resource
 def get_hangul_font():
-    # 파일이 동작하는 환경에 한글 폰트가 없으면 나눔고딕 웹 폰트를 다운로드해서 사용하도록 안전 조치합니다.
     font_filename = "NanumGothicBold.ttf"
     if not os.path.exists(font_filename):
         try:
@@ -258,20 +257,19 @@ def get_hangul_font():
         except:
             pass
             
-    # 우선순위별 시스템 한글 폰트 목록 탐색
     font_paths = [
-        font_filename, # 다운로드한 폰트
-        "C:/Windows/Fonts/malgun.ttf", # Windows 맑은고딕
-        "C:/Windows/Fonts/malgunbd.ttf", # Windows 맑은고딕 Bold
-        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", # Linux 나눔고딕
-        "/System/Library/Fonts/Supplemental/AppleGothic.ttf" # Mac 애플고딕
+        font_filename, 
+        "C:/Windows/Fonts/malgun.ttf", 
+        "C:/Windows/Fonts/malgunbd.ttf", 
+        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 
+        "/System/Library/Fonts/Supplemental/AppleGothic.ttf"
     ]
     for path in font_paths:
         if os.path.exists(path):
             return path
     return None
 
-# 결과 이미지 생성 함수 (한글 고도화 대응)
+# 결과 이미지 생성 함수 (메모리 버그 완벽 보정)
 def generate_seat_image(df, assignments):
     cell_w, cell_h = 140, 90
     margin = 15
@@ -282,9 +280,7 @@ def generate_seat_image(df, assignments):
     img = Image.new("RGB", (img_w, img_h), "#FFFFFF")
     draw = ImageDraw.Draw(img)
     
-    # 확실하게 한정된 한글 폰트 경로 로드
     font_path = get_hangul_font()
-    
     if font_path:
         font_main = ImageFont.truetype(font_path, 15)
         font_sub = ImageFont.truetype(font_path, 11)
@@ -315,7 +311,6 @@ def generate_seat_image(df, assignments):
                     bx2, by2 = x2 - 10, y1 + 45
                     draw.rounded_rectangle([bx1, by1, bx2, by2], radius=4, fill="#2ECC71", outline="#27AE60", width=1)
                     
-                    # 텍스트 길이 측정 방식 고도화
                     try:
                         bbox = draw.textbbox((0, 0), assigned_user, font=font_main)
                         tw = bbox[2] - bbox[0]
@@ -353,6 +348,7 @@ def generate_seat_image(df, assignments):
                     
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG', quality=95)
+    img_byte_arr.seek(0) # 💡 포인터를 맨 앞으로 돌려 바이트 데이터 유실 방지
     return img_byte_arr.getvalue()
 
 

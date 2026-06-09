@@ -44,6 +44,17 @@ st.markdown("""
         background-color: #f0f7ff !important;
     }
 
+    /* 리셔플링 및 초기화 특수 버튼 스타일 지정 */
+    .custom-control-btn button {
+        background-color: #F1F5F9 !important;
+        border: 1px solid #CBD5E1 !important;
+        color: #1E293B !important;
+    }
+    .custom-control-btn button:hover {
+        background-color: #E2E8F0 !important;
+        border-color: #94A3B8 !important;
+    }
+
     /* 💻 [PC 환경 전용 스타일: 너비 800px 이상] */
     @media (min-width: 800px) {
         div.stButton > button {
@@ -108,8 +119,8 @@ st.markdown("""
     
     /* 💡 엑셀 내 X 표시 셀 전용 서식 (테두리가 있는 선명한 검은색 박스) */
     .black-pillar-space {
-        border: 1px solid #475569 !important; /* 명확한 사각형 테두리 */
-        background-color: #1E293B !important; /* 딥 다크 블랙 색상 */
+        border: 1px solid #475569 !important;
+        background-color: #1E293B !important;
         border-radius: 8px;
     }
     
@@ -162,8 +173,7 @@ def load_initial_members():
 
 # 4. 좌석배치.xlsx 파일 분석 엔진 (A~S 가용 좌석만 추출)
 def load_excel_layout():
-    # 명단 매핑은 오직 A부터 S까지만 엄격하게 제한 (총 19개)
-    valid_seat_letters = [chr(i) for i in range(65, 84)] 
+    valid_seat_letters = [chr(i) for i in range(65, 84)] # 오직 A부터 S까지만 허용 (총 19개)
     file_name = "좌석배치.xlsx"
     
     if os.path.exists(file_name):
@@ -181,7 +191,7 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 💡 [치명적 오류 해결]: 백업 데이터 자체를 원본 엑셀(A~S 및 X 마킹 구조)과 완전히 똑같이 동기화
+    # 동기화된 안전한 백업 도면 사양
     backup_data = [
         ["A", "B", "C", "", "D", "E", "X"],
         ["", "", "", "", "", "", ""],         
@@ -211,6 +221,11 @@ def assign_seat(name):
         st.session_state.members.remove(name)
         st.rerun()
 
+# 💡 명단 순서를 무작위로 뒤섞는 리셔플링 함수
+def shuffle_members():
+    random.shuffle(st.session_state.members)
+    st.rerun()
+
 def reset_program():
     _, fresh_seats = load_excel_layout()
     st.session_state.members = load_initial_members()
@@ -224,7 +239,7 @@ def reset_program():
 title_col, btn_col = st.columns([4, 1])
 title_col.subheader("🖥️ Security솔루션팀 좌석 배치 앱")
 with btn_col:
-    if st.button("🔄 초기화", key="reset_btn", use_container_width=True):
+    if st.button("🔄 전체 초기화", key="reset_btn", use_container_width=True):
         reset_program()
 
 st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
@@ -237,7 +252,15 @@ left_col, right_col = st.columns([1, 2.5])
 # [명단 영역]
 with left_col:
     st.markdown("<div class='section-title'>👥 명단</div>", unsafe_allow_html=True)
+    
+    # 💡 명단 섹션 바로 아래에 리셔플링 제어 버튼 배치
     if st.session_state.members:
+        st.markdown("<div class='custom-control-btn'>", unsafe_allow_html=True)
+        if st.button("🔄 명단 리셔플링", key="shuffle_btn", use_container_width=True):
+            shuffle_members()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom: 0.5rem;'></div>", unsafe_allow_html=True)
+        
         grid_cols = st.columns(4)
         for idx, name in enumerate(st.session_state.members):
             col_target = grid_cols[idx % 4]

@@ -3,17 +3,17 @@ import pandas as pd
 import random
 import os
 
-# 1. 기본 화면 설정 및 가로폭 최대화
+# 1. 화면 최적화 및 레이아웃 기본 설정
 st.set_page_config(
     page_title="Security솔루션팀 좌석 배치 앱",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 2. PC(좌우) / 모바일(상하 + 명단 수평 4열 강제 고정) 및 검은색 칸(기둥) 스타일 디자인 CSS 주입
+# 2. PC(좌우) / 모바일(상하 + 명단 4열 강제) 및 엑셀 검은색 셀(기둥/벽) 시각화 CSS 주입
 st.markdown("""
     <style>
-    /* 상단 타이틀 메뉴 바 잘림 방지 및 기본 여백 최적화 */
+    /* 상단 타이틀 메뉴 바 잘림 방지 및 전체 레이아웃 패딩 최적화 */
     .block-container {
         padding-top: 4.5rem !important;
         padding-bottom: 1.5rem !important;
@@ -73,7 +73,7 @@ st.markdown("""
             flex-wrap: wrap !important;
             gap: 6px !important;
         }
-        /* 개별 명단 버튼이 모바일에서 가로폭의 정확히 1/4(25%)씩 차지하도록 칼같이 고정 */
+        /* 개별 명단 버튼이 모바일에서 가로폭의 정확히 1/4(25%)씩 차지하도록 고정 */
         [data-testid="stHorizontalBlock"] > div:first-child [data-testid="stHorizontalBlock"] > div {
             flex: 0 0 calc(25% - 5px) !important;
             min-width: calc(25% - 5px) !important;
@@ -89,7 +89,7 @@ st.markdown("""
             border-radius: 4px !important;
         }
         
-        /* 하단 배치도 공간을 위한 10% 이상 상하 압축 */
+        /* 하단 배치도 공간을 위한 상하 압축 */
         .seat-table { border-spacing: 6px !important; }
         .seat-table td { height: 55px !important; border-radius: 5px !important; }
         .empty-row-space { height: 18px !important; }
@@ -114,16 +114,13 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 💡 [요구사항 추가] 검은색 영역(기둥 또는 고정 벽) 전용 시각화 스타일 */
-    .pillar-space {
-        border: 1px solid #7F8C8D !important;
-        background-color: #555555 !important; /* 어두운 회색/검은색 계열로 기둥 표시 */
-        color: #FFFFFF !important;
-        font-size: 0.85rem;
+    /* 💡 [핵심 요구사항 반영] 엑셀 내 검정색 셀(기둥/구조물) 표현용 CSS 고도화 */
+    .black-pillar-space {
+        border: 1px solid #333333 !important;
+        background-color: #2C3E50 !important; /* 세련된 딥 다크 검정 회색 계열 */
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.5) !important;
+        color: #2C3E50 !important; /* 내부 텍스트 무력화 숨김 */
         border-radius: 8px;
-    }
-    @media (max-width: 799px) {
-        .pillar-space { font-size: 9px !important; }
     }
     
     .empty-row-space { border: none !important; background-color: transparent !important; }
@@ -172,7 +169,7 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 좌석배치.xlsx 구조 분석 및 가장 우측 열 제외 함수
+# 4. 좌석배치.xlsx 구조 분석 및 검정색 셀 분리 추출 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
@@ -181,35 +178,31 @@ def load_excel_layout():
             df = df.fillna("")
             df = df.map(lambda x: str(x).strip()) if hasattr(df, 'map') else df.applymap(lambda x: str(x).strip())
             
-            # 우측 열 제외 처리 규칙 유지
-            if len(df.columns) > 0:
-                df = df.iloc[:, :-1]
-                
-            # 배정 풀(Pool)용 좌석 기호 수집
-            seats = []
-            # 기둥이나 벽으로 선언할 텍스트 키워드들 목록 지정
-            pillar_keywords = ["기둥", "X", "막힘", "Pillar"]
+            # 💡 엑셀 검정색 영역에 들어갈 수 있는 값 정의 (0, X, 기둥, 막힘 등 파싱)
+            black_cell_keywords = ["0", "0.0", "X", "x", "기둥", "막힘"]
             
+            seats = []
             for row in df.values:
                 for val in row:
-                    # 빈칸이 아니고 기둥 키워드도 아닌 정상 좌석 문자(A~S)만 추출
-                    if val != "" and val not in pillar_keywords:
+                    # 완전 빈칸이 아니고, 검은색 지정 키워드도 아닌 실제 자릿수(A~S)만 랜덤 풀에 마운트
+                    if val != "" and val not in black_cell_keywords:
                         seats.append(val)
             return df, seats
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
+    # 파일 손실 대응용 백업 레이아웃 기본 구조
     backup_data = [
         ["A", "B", "C", "", "D", "E"],
         ["", "", "", "", "", ""],         
-        ["기둥", "F", "G", "", "H", "I"], # 샘플용 기둥 매핑 예시
+        ["0", "F", "G", "", "H", "I"], # 샘플 검은색 셀(0) 테스트 케이스
         ["J", "K", "L", "", "M", "N"],
         ["", "", "", "", "", ""],         
         ["O", "P", "Q", "", "R", "S"]
     ]
     return pd.DataFrame(backup_data), ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S"]
 
-# 5. 세션 관리 및 데이터 초기 마운트
+# 5. 세션 관리 및 데이터 초기 바인딩
 layout_df, available_seats_list = load_excel_layout()
 
 if 'members' not in st.session_state:
@@ -262,12 +255,12 @@ with left_col:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [좌석 별 배치 영역]
+# [좌석 별 배치 영역] - 엑셀 내부 검은색 구조물 자동 필터링 반영 영역
 with right_col:
     st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
     
     html_table = "<table class='seat-table'>"
-    pillar_keywords = ["기둥", "X", "막힘", "Pillar"] # 기둥 판별용 리스트
+    black_cell_keywords = ["0", "0.0", "X", "x", "기둥", "막힘"]
     
     for r_idx, row in layout_df.iterrows():
         is_empty_row = all(cell_value == "" for cell_value in row)
@@ -277,11 +270,13 @@ with right_col:
                 html_table += f"<td class='empty-row-space' colspan='{len(row)}'></td>"
                 break
             elif cell_value == "":
+                # 완전 비어있는 셀 = 투명 통로 처리
                 html_table += "<td class='empty-space'></td>"
-            elif cell_value in pillar_keywords:
-                # 💡 [요구사항 반영] 엑셀 셀 값이 기둥 키워드인 경우 매핑에서 제외하고 어두운 벽 구조로 렌더링
-                html_table += f"<td class='pillar-space'>{cell_value}</td>"
+            elif cell_value in black_cell_keywords:
+                # 💡 [핵심 반영] 엑셀에서 검정색으로 마킹된 셀 발견 시 전용 다크 솔리드 스타일로 채움
+                html_table += "<td class='black-pillar-space'></td>"
             else:
+                # 유효한 정상 배정 대상 좌석 슬롯 (A ~ S)
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"
                 if assigned_user:

@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import os
-import base64  # ◀ 필수 라이브러리 추가 완료
+import base64
 
 # 1. 반응형 웹 환경 설정
 st.set_page_config(
@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 인라인 CSS: 이미지 위에 이름을 절대 좌표로 얹고 기기별 명단 격자 제어
+# 인라인 CSS
 st.markdown("""
     <style>
     .block-container {
@@ -24,18 +24,14 @@ st.markdown("""
     .sub-title-text { font-size: 0.8rem; color: #7F8C8D; text-align: center; margin-bottom: 0.8rem; }
     h3 { font-size: 1.1rem !important; margin-bottom: 0.4rem !important; }
 
-    /* 반응형 기기별 명단 뷰 분기 */
     @media (min-width: 800px) { .pc-hint { display: block; } .mobile-hint { display: none; } }
     @media (max-width: 799px) { .pc-hint { display: none; } .mobile-hint { display: block; } }
 
-    /* 이미지 컨테이너 (좌표 기준점) */
     .image-container {
         position: relative;
         width: 100%;
         display: inline-block;
     }
-    
-    /* 도면 이미지 반응형 스타일 */
     .bg-image {
         width: 100%;
         height: auto;
@@ -43,11 +39,9 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
-
-    /* 이미지 위에 랜덤하게 올라갈 이름표 스타일 */
     .floating-name {
         position: absolute;
-        transform: translate(-50%, -50%); /* 좌표의 정중앙에 이름이 오도록 정렬 */
+        transform: translate(-50%, -50%);
         padding: 4px 8px;
         font-size: 12px;
         font-weight: bold;
@@ -55,12 +49,24 @@ st.markdown("""
         text-align: center;
         box-shadow: 0 2px 5px rgba(0,0,0,0.20);
         white-space: nowrap;
-        pointer-events: none; /* 클릭 이벤트 방해 방지 */
+        pointer-events: none;
     }
     .name-leader { background-color: #FFEB3B; color: #E65100; border: 2px solid #E65100; }
     .name-member { background-color: #2ECC71; color: #FFFFFF; border: 1px solid #27AE60; }
     </style>
 """, unsafe_allow_html=True)
+
+# 📍 좌석별 이미지 내 상대 위치 좌표 설정
+SEAT_COORDINATES = {
+    'A': {'top': '12%', 'left': '18%'}, 'B': {'top': '12%', 'left': '32%'}, 'C': {'top': '12%', 'left': '45%'},
+    'D': {'top': '12%', 'left': '65%'}, 'E': {'top': '12%', 'left': '78%'}, 'F': {'top': '12%', 'left': '91%'},
+    'G': {'top': '42%', 'left': '32%'}, 'H': {'top': '42%', 'left': '45%'},
+    'I': {'top': '42%', 'left': '65%'}, 'J': {'top': '42%', 'left': '78%'}, 'K': {'top': '42%', 'left': '91%'},
+    'L': {'top': '58%', 'left': '18%'}, 'M': {'top': '58%', 'left': '32%'}, 'N': {'top': '58%', 'left': '45%'},
+    'O': {'top': '58%', 'left': '65%'}, 'P': {'top': '58%', 'left': '78%'}, 'Q': {'top': '58%', 'left': '91%'},
+    'R': {'top': '88%', 'left': '18%'}, 'S': {'top': '88%', 'left': '32%'}, 'T': {'top': '88%', 'left': '45%'},
+    'U': {'top': '88%', 'left': '65%'}, 'V': {'top': '88%', 'left': '78%'}, 'W': {'top': '88%', 'left': '91%'}
+}
 
 # 2. 데이터 로드 및 초기화
 def load_member_list():
@@ -74,37 +80,21 @@ def load_member_list():
             return [f"팀원{i}" for i in range(1, 19)]
     return [f"홍길동{i}" for i in range(1, 19)]
 
+# 세션 상태(Session State) 안정화 처리
 if 'original_members' not in st.session_state:
     st.session_state.original_members = load_member_list()
 if 'current_members' not in st.session_state:
     st.session_state.current_members = st.session_state.original_members.copy()
 if 'assignments' not in st.session_state:
     st.session_state.assignments = {}
-
-# 📍 좌석별 이미지 내 상대 위치 좌표 설정 (top: 위에서부터 %, left: 왼쪽에서부터 %)
-SEAT_COORDINATES = {
-    # 1행 (A~F)
-    'A': {'top': '12%', 'left': '18%'}, 'B': {'top': '12%', 'left': '32%'}, 'C': {'top': '12%', 'left': '45%'},
-    'D': {'top': '12%', 'left': '65%'}, 'E': {'top': '12%', 'left': '78%'}, 'F': {'top': '12%', 'left': '91%'},
-    # 3행 (G~K) -> G 자리는 기둥이므로 H가 첫 번째 좌석이 됨
-    'G': {'top': '42%', 'left': '32%'}, 'H': {'top': '42%', 'left': '45%'},
-    'I': {'top': '42%', 'left': '65%'}, 'J': {'top': '42%', 'left': '78%'}, 'K': {'top': '42%', 'left': '91%'},
-    # 4행 (L~Q)
-    'L': {'top': '58%', 'left': '18%'}, 'M': {'top': '58%', 'left': '32%'}, 'N': {'top': '58%', 'left': '45%'},
-    'O': {'top': '58%', 'left': '65%'}, 'P': {'top': '58%', 'left': '78%'}, 'Q': {'top': '58%', 'left': '91%'},
-    # 6행 (R~W)
-    'R': {'top': '88%', 'left': '18%'}, 'S': {'top': '88%', 'left': '32%'}, 'T': {'top': '88%', 'left': '45%'},
-    'U': {'top': '88%', 'left': '65%'}, 'V': {'top': '88%', 'left': '78%'}, 'W': {'top': '88%', 'left': '91%'}
-}
-
-# 랜덤 타겟팅을 위한 실시간 빈 잔여 좌석 계산
-all_valid_seats = list(SEAT_COORDINATES.keys())
-assigned_seats = list(st.session_state.assignments.keys())
-available_seats = [s for s in all_valid_seats if s not in assigned_seats]
+# ⭐ 핵심 수정: 잔여 좌석 풀 자체를 세션 상태에 기록하여 유실 방지
+if 'available_seats' not in st.session_state:
+    st.session_state.available_seats = list(SEAT_COORDINATES.keys())
 
 def reset_all():
     st.session_state.current_members = st.session_state.original_members.copy()
     st.session_state.assignments = {}
+    st.session_state.available_seats = list(SEAT_COORDINATES.keys())
 
 # --- 메인 레이아웃 구성 ---
 st.markdown("<h1>🖥️ 이미지 랜덤 매핑 좌석 배치 에이전트</h1>", unsafe_allow_html=True)
@@ -122,9 +112,12 @@ with left_panel:
         pc_cols = st.columns(2)
         for idx, name in enumerate(st.session_state.current_members):
             col_target = pc_cols[idx % 2]
-            if col_target.button(name, key=f"pc_{name}", use_container_width=True):
-                if available_seats:
-                    chosen_seat = random.choice(available_seats)
+            # 버튼의 중복 생성을 막기 위해 key 고유값 처리
+            if col_target.button(name, key=f"pc_{name}_{len(st.session_state.current_members)}", use_container_width=True):
+                if st.session_state.available_seats:
+                    # 세션 상태에 저장된 안전한 좌석 풀에서 무작위 선택
+                    chosen_seat = random.choice(st.session_state.available_seats)
+                    st.session_state.available_seats.remove(chosen_seat)
                     st.session_state.assignments[chosen_seat] = name
                     st.session_state.current_members.remove(name)
                     st.rerun()
@@ -137,9 +130,10 @@ with left_panel:
         mobile_cols = st.columns(5)
         for idx, name in enumerate(st.session_state.current_members):
             col_target = mobile_cols[idx % 5]
-            if col_target.button(name, key=f"mo_{name}", use_container_width=True):
-                if available_seats:
-                    chosen_seat = random.choice(available_seats)
+            if col_target.button(name, key=f"mo_{name}_{len(st.session_state.current_members)}", use_container_width=True):
+                if st.session_state.available_seats:
+                    chosen_seat = random.choice(st.session_state.available_seats)
+                    st.session_state.available_seats.remove(chosen_seat)
                     st.session_state.assignments[chosen_seat] = name
                     st.session_state.current_members.remove(name)
                     st.rerun()
@@ -156,22 +150,21 @@ with right_panel:
     title_space.markdown("<h3>🪑 실시간 배치도 (한눈에 보기)</h3>", unsafe_allow_html=True)
     
     with reset_space:
-        if st.button("🔄 전체 리셋", key="reset", use_container_width=True):
+        if st.button("🔄 전체 리셋", key="reset_trigger", use_container_width=True):
             reset_all()
             st.rerun()
 
     image_path = "좌석배치.png"
     if os.path.exists(image_path):
         try:
-            # 💡 HTML 렌더링 시작
             html_buffer = "<div class='image-container'>"
             
-            # 배경 이미지 인라인 로드 (Base64 안전 인코딩)
+            # 배경 이미지 인라인 로드 (Base64)
             with open(image_path, "rb") as img_file:
                 img_base64 = base64.b64encode(img_file.read()).decode()
             html_buffer += f"<img src='data:image/png;base64,{img_base64}' class='bg-image' alt='사무실 좌석 배치도'>"
             
-            # 실시간 랜덤 추첨 완료된 이름들 맵핑 레이어 생성
+            # 배정 완료된 이름표 레이어 팝업
             for seat, user_name in st.session_state.assignments.items():
                 if seat in SEAT_COORDINATES:
                     pos = SEAT_COORDINATES[seat]
@@ -183,10 +176,8 @@ with right_panel:
                         </div>
                     """
             html_buffer += "</div>"
-            
-            # 웹 브라우저 화면에 최종 주입
             st.markdown(html_buffer, unsafe_allow_html=True)
         except Exception as e:
             st.error(f"이미지 처리 중 오류 발생: {e}")
     else:
-        st.error(f"🚨 폴더 내에서 '{image_path}' 파일을 찾을 수 없습니다. 파일명을 정확히 확인해 주세요.")
+        st.error(f"🚨 폴더 내에서 '{image_path}' 파일을 찾을 수 없습니다. 파일 이름을 확인해 주세요.")

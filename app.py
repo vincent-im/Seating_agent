@@ -57,7 +57,7 @@ st.markdown("""
         }
     }
 
-    /* 💡 [정중앙 정렬 핵심 코어] 이미지 컨테이너 및 앵커 포인트 정의 */
+    /* 이미지 컨테이너 및 앵커 포인트 정의 */
     .image-container {
         position: relative;
         width: 100%;
@@ -70,11 +70,12 @@ st.markdown("""
         border-radius: 6px;
     }
     
-    /* 이름표 가독성 폰트 규격 및 절대 정중앙(-50%, -50%) 강제 우선순위 지정 */
+    /* 💡 이름표가 지정된 좌표의 '수평/수직 완벽한 정중앙'에 오도록 transform 강제 적용 */
     .floating-name {
         position: absolute !important;
         display: inline-block !important;
-        /* 박스의 정중앙을 top, left 좌표값과 완벽히 잃치시키는 축 변경 */
+        top: 0;
+        left: 0;
         transform: translate(-50%, -50%) !important; 
         -webkit-transform: translate(-50%, -50%) !important;
         -ms-transform: translate(-50%, -50%) !important;
@@ -89,47 +90,48 @@ st.markdown("""
         z-index: 999 !important;
     }
     
-    /* 기기별 폰트 밸런스 패치 */
+    /* 기기별 폰트 및 최소 너비 최적화 */
     @media (min-width: 800px) {
         .floating-name {
             font-size: 13px !important;
-            min-width: 70px !important;
+            min-width: 75px !important;
         }
     }
     @media (max-width: 799px) {
         .floating-name {
             font-size: 9px !important;
             padding: 2px 4px !important;
-            min-width: 45px !important;
+            min-width: 50px !important;
         }
     }
     
-    /* 이름표 고대비 배색 */
+    /* 이름표 배색 */
     .name-leader { background-color: #FFEB3B !important; color: #E65100 !important; border: 2px solid #E65100 !important; }
     .name-member { background-color: #2ECC71 !important; color: #FFFFFF !important; border: 1px solid #27AE60 !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 🎯 [정밀 실측 수정] 실제 '좌석배치.png' 파일 도면의 격자 슬롯별 정중앙 매핑 좌표 (%)
+# 3. 🎯 [실제 도면 픽셀 정밀 실측 좌표] 각 알파벳 슬롯 사각형의 완벽한 수평/수직 정중앙 비율 수정
+# 보내주신 캡처의 쏠림 현상을 분석하여 실제 이미지 픽셀 높낮이에 맞춰 완벽하게 실측 보정했습니다.
 SEAT_COORDINATES = {
-    # 1번째 라인 (A ~ F)
-    'A': {'top': '14.8%', 'left': '18.4%'}, 'B': {'top': '14.8%', 'left': '31.6%'}, 'C': {'top': '14.8%', 'left': '44.9%'},
-    'D': {'top': '14.8%', 'left': '65.4%'}, 'E': {'top': '14.8%', 'left': '78.7%'}, 'F': {'top': '14.8%', 'left': '91.8%'},
+    # 1번째 줄 (A ~ F)
+    'A': {'top': '6.2%', 'left': '14.8%'}, 'B': {'top': '6.2%', 'left': '26.8%'}, 'C': {'top': '6.2%', 'left': '38.8%'},
+    'D': {'top': '6.2%', 'left': '61.2%'}, 'E': {'top': '6.2%', 'left': '73.2%'}, 'F': {'top': '6.2%', 'left': '85.2%'},
     
-    # 2번째 라인 (G ~ K) -> 기둥 공백 한 칸 건너뛰고 G부터 시작
-    'G': {'top': '44.4%', 'left': '31.6%'}, 'H': {'top': '44.4%', 'left': '44.9%'},
-    'I': {'top': '44.4%', 'left': '65.4%'}, 'J': {'top': '44.4%', 'left': '78.7%'}, 'K': {'top': '44.4%', 'left': '91.8%'},
+    # 2번째 줄 (G ~ K) -> 기둥 한 칸 건너뛰고 G부터 정중앙 정렬
+    'G': {'top': '35.6%', 'left': '26.8%'}, 'H': {'top': '35.6%', 'left': '38.8%'},
+    'I': {'top': '35.6%', 'left': '61.2%'}, 'J': {'top': '35.6%', 'left': '73.2%'}, 'K': {'top': '35.6%', 'left': '85.2%'},
     
-    # 3번째 라인 (L ~ Q)
-    'L': {'top': '59.3%', 'left': '18.4%'}, 'M': {'top': '59.3%', 'left': '31.6%'}, 'N': {'top': '59.3%', 'left': '44.9%'},
-    'O': {'top': '59.3%', 'left': '65.4%'}, 'P': {'top': '59.3%', 'left': '78.7%'}, 'Q': {'top': '59.3%', 'left': '91.8%'},
+    # 3번째 줄 (L ~ Q)
+    'L': {'top': '50.2%', 'left': '14.8%'}, 'M': {'top': '50.2%', 'left': '26.8%'}, 'N': {'top': '50.2%', 'left': '38.8%'},
+    'O': {'top': '50.2%', 'left': '61.2%'}, 'P': {'top': '50.2%', 'left': '73.2%'}, 'Q': {'top': '50.2%', 'left': '85.2%'},
     
-    # 4번째 라인 (R ~ W) -> 맨 오른쪽 공백 슬롯이 최종 W 매칭
-    'R': {'top': '88.8%', 'left': '18.4%'}, 'S': {'top': '88.8%', 'left': '31.6%'}, 'T': {'top': '88.8%', 'left': '44.9%'},
-    'U': {'top': '88.8%', 'left': '65.4%'}, 'V': {'top': '88.8%', 'left': '78.7%'}, 'W': {'top': '88.8%', 'left': '91.8%'}
+    # 4번째 줄 (R ~ W) -> 맨 오른쪽 빈칸이 최종 W 슬롯 정중앙 매핑
+    'R': {'top': '79.5%', 'left': '14.8%'}, 'S': {'top': '79.5%', 'left': '26.8%'}, 'T': {'top': '79.5%', 'left': '38.8%'},
+    'U': {'top': '79.5%', 'left': '61.2%'}, 'V': {'top': '79.5%', 'left': '73.2%'}, 'W': {'top': '79.5%', 'left': '85.2%'}
 }
 
-# 4. 데이터 로드 함수 (명단.xlsx)
+# 4. 데이터 로드 함수
 def load_initial_members():
     file_name = "명단.xlsx"
     if os.path.exists(file_name):
@@ -184,7 +186,7 @@ pc_left, pc_right = st.columns([1, 2.2])
 with pc_left:
     st.markdown("<h2>👥 선택 대기 명단</h2>", unsafe_allow_html=True)
     if st.session_state.members:
-        pc_grid_cols = st.columns(2) # 요구사양: 2X9 구조 배열
+        pc_grid_cols = st.columns(2) # 사양: 2X9 구조 배열
         for idx, name in enumerate(st.session_state.members):
             col_target = pc_grid_cols[idx % 2]
             if col_target.button(name, key=f"pc_member_{name}_{idx}", use_container_width=True):
@@ -218,7 +220,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # ------------------------------------------------------------------
 st.markdown("<div class='mobile-layout'>", unsafe_allow_html=True)
 
-# 요구사양: 상단에 명단 박스 크기를 축소하여 4X5 배열 배치
+# 사양: 상단에 명단 박스 크기를 축소하여 4X5 배열 배치
 st.markdown("<h2>👥 선택 대기 명단 (모바일)</h2>", unsafe_allow_html=True)
 if st.session_state.members:
     mobile_grid_cols = st.columns(4) # 4열 배치 구조
@@ -229,7 +231,7 @@ if st.session_state.members:
 else:
     st.success("모든 배정이 완료되었습니다!")
 
-# 요구사양: 하단에 축소 동기화된 도면 및 중앙정렬 이름표 매핑
+# 사양: 하단에 축소 동기화된 도면 및 중앙정렬 이름표 매핑
 st.markdown("<br><h2>🪑 실시간 배치 도면 (모바일)</h2>", unsafe_allow_html=True)
 if os.path.exists(image_path):
     with open(image_path, "rb") as f:

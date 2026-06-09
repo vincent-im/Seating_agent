@@ -147,7 +147,6 @@ st.markdown("""
         display: inline-block;
         white-space: nowrap;
     }
-    /* 💡 모든 팀원의 이름표 색상을 동일한 녹색 스타일로 단일화 */
     .name-member { background-color: #2ECC71 !important; color: #FFFFFF !important; border: 1px solid #27AE60 !important; }
     
     .seat-label {
@@ -279,9 +278,10 @@ with left_col:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [좌석 별 배치 영역]
+# [좌석 배치 영역]
 with right_col:
-    st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
+    # 💡 요청하신 대로 제목을 '🪑 좌석 별 배치'에서 '🪑 좌석 배치'로 변경했습니다.
+    st.markdown("<div class='section-title'>🪑 좌석 배치</div>", unsafe_allow_html=True)
     
     html_table = "<table class='seat-table'>"
     
@@ -301,7 +301,6 @@ with right_col:
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"
                 if assigned_user:
-                    # 💡 조건 구문을 제거하여 '김광녕' 포함 모든 팀원이 'name-member' 녹색 스타일을 갖도록 일괄 변경
                     style_class = "name-member"
                     html_table += f"""
                     <div class='seat-slot-assigned'>

@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 엑셀 도면 서식(정확한 통로 위치 및 검은색 기둥 지정)을 구현하는 CSS 주입
+# 2. 엑셀 도면 서식(통로/X 마킹 검은색 박스)을 완벽히 구현하는 CSS 주입
 st.markdown("""
     <style>
     /* 상단 메뉴바 잘림 방지 및 전체 레이아웃 패딩 최적화 */
@@ -106,10 +106,10 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 💡 [요구사항 100% 반영] 명확한 테두리를 가진 검은색 구조물 (기둥) 박스 스타일 */
+    /* 💡 [요구사항 반영] 엑셀 내 X 표시 셀 전용 CSS 서식 (테두리가 있는 검은색 박스) */
     .black-pillar-space {
-        border: 1px solid #475569 !important;
-        background-color: #1E293B !important;
+        border: 1px solid #475569 !important; /* 명확한 사각형 테두리 */
+        background-color: #1E293B !important; /* 딥 다크 블랙 색상 */
         border-radius: 8px;
     }
     
@@ -160,7 +160,7 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 좌석배치.xlsx 파일 분석 및 A~S 가용 좌석만 칼같이 필터링하는 엔진
+# 4. 좌석배치.xlsx 파일 분석 및 A~S 가용 좌석만 추출하는 엔진
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
@@ -169,9 +169,9 @@ def load_excel_layout():
             df = df.fillna("")
             df = df.map(lambda x: str(x).strip()) if hasattr(df, 'map') else df.applymap(lambda x: str(x).strip())
             
-            # 정확하게 매핑될 가용 좌석 리스트 풀(Pool) 수집 (A~S만 엄격하게 한정)
+            # 💡 명단 매핑은 A(65)부터 S(83)까지 적힌 셀에만 철저하게 한정합니다.
             seats = []
-            valid_seat_letters = [chr(i) for i in range(65, 84)] # A부터 S까지
+            valid_seat_letters = [chr(i) for i in range(65, 84)] 
             
             for row in df.values:
                 for val in row:
@@ -181,14 +181,13 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 파일 손실 시 복구 백업 데이터 기본 구조
     backup_data = [
-        ["A", "B", "C", "", "D", "E"],
-        ["", "", "", "", "", ""],         
-        ["", "F", "G", "", "H", "I"],
-        ["J", "K", "L", "", "M", "N"],
-        ["", "", "", "", "", ""],         
-        ["O", "P", "Q", "", "R", "S"]
+        ["A", "B", "C", "", "D", "E", "X"],
+        ["", "", "", "", "", "", ""],         
+        ["X", "F", "G", "", "H", "I", "X"],
+        ["J", "K", "L", "", "M", "N", "X"],
+        ["", "", "", "", "", "", ""],         
+        ["O", "P", "Q", "", "R", "S", "X"]
     ]
     return pd.DataFrame(backup_data), ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S"]
 
@@ -249,40 +248,26 @@ with left_col:
 with right_col:
     st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
     
-    total_cols = len(layout_df.columns)
-    # 4번째 열(index 3)이 순수 세로 통로인지 검증하는 리스트
-    is_empty_col = [all(layout_df.iloc[r, c] == "" for r in range(len(layout_df))) for c in range(total_cols)]
-    
     html_table = "<table class='seat-table'>"
     
     for r_idx, row in layout_df.iterrows():
-        # 행 전체(2행, 5행)가 비어있는 가로 통로 줄인지 판별 (0부터 시작하므로 index 1, index 4 해당)
+        # 행 전체가 통째로 비어있는 가로 통로 줄인지 판별
         is_empty_row = all(cell_value == "" for cell_value in row)
         
         html_table += "<tr>"
         for c_idx, cell_value in enumerate(row):
-            
-            # 💡 [요구사항 매칭 조건 1]: 2행 전체(r_idx=1) 또는 5행 전체(r_idx=4)는 '투명 가로 통로'
             if is_empty_row:
-                html_table += f"<td class='empty-row-space' colspan='{total_cols}'></td>"
+                # 1. 가로 통로 라인: 테두리 없는 완전 투명 처리
+                html_table += f"<td class='empty-row-space' colspan='{len(row)}'></td>"
                 break
-                
-            # 💡 [요구사항 매칭 조건 2]: 4번째 열 전체(c_idx=3)는 '투명 세로 통로'
-            elif is_empty_col[c_idx]:
-                html_table += "<td class='empty-space'></td>"
-                
-            # 💡 [요구사항 매칭 조건 3]: 명시해주신 정밀 기둥 위치 강제 인테리어 셋업
-            # - 엑셀 기준 A열 3행 (index로는 r_idx=2, c_idx=0)
-            # - 엑셀 기준 가장 우측 G열(현재 제외 후 마지막 열인 F열 위치)의 1, 3, 4, 6행 (c_idx=5)
-            elif (r_idx == 2 and c_idx == 0) or (c_idx == 5 and r_idx in [0, 2, 3, 5]):
+            elif cell_value == "X":
+                # 2. 💡 [요구사항 핵심]: 엑셀에 'X'라고 마킹된 셀은 테두리가 둘러싸인 검은색 구조물 박스로 변환
                 html_table += "<td class='black-pillar-space'></td>"
-                
-            # 💡 [요구사항 매칭 조건 4]: 그 외 구조물 내부의 알파벳이 없는 공백은 유연하게 통로선 연장
             elif cell_value == "":
+                # 3. 세로 통로 라인 (4번째 열 등): 테두리 없는 투명 처리
                 html_table += "<td class='empty-space'></td>"
-                
             else:
-                # 유효한 정상 배정 대상 좌석 슬롯 (A ~ S)
+                # 4. 유효한 정상 배정 대상 좌석 슬롯 (A ~ S)
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"
                 if assigned_user:

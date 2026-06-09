@@ -10,17 +10,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 엑셀 기반 좌석 표(Table) 및 이름표 스타일 지정을 위한 CSS 주입
+# 2. 엑셀 기반 좌석 표(Table) 및 잘림 방지 패딩 보정을 위한 CSS 주입
 st.markdown("""
     <style>
-    /* 전체 레이아웃 패딩 최적화 */
+    /* 💡 [핵심 교정 단락] 상단 시스템 메뉴와 겹쳐 잘리는 현상을 막기 위해 여백을 4.5rem으로 늘림 */
     .block-container {
-        padding: 1.5rem 1rem !important;
+        padding-top: 4.5rem !important;
+        padding-bottom: 2rem !important;
+        padding-left: 1.5rem !important;
+        padding-right: 1.5rem !important;
     }
+    
+    /* 섹션 타이틀 서식 */
     .section-title { 
         font-size: 1.4rem !important; 
         font-weight: bold; 
-        margin-bottom: 1rem !important; 
+        margin-bottom: 1.2rem !important; 
         color: #2C3E50; 
     }
     
@@ -130,8 +135,7 @@ def load_excel_layout():
             df = pd.read_excel(file_name, header=None)
             df = df.fillna("") # 결측치를 빈 문자열로 변환
             
-            # 💡 [핵심 디버깅 구간] 판다스 버전에 따른 applymap 탈피 및 최신 map 엔진 도입
-            # 최신 버전 판다스에서는 applymap이 삭제되었으므로, 호환성을 위해 속성 체크 후 안전하게 스위칭합니다.
+            # 호환성을 고려한 맵핑 함수 가동
             if hasattr(df, 'map'):
                 df = df.map(lambda x: str(x).strip())
             else:
@@ -188,13 +192,15 @@ def reset_program():
     st.rerun()
 
 # ------------------------------------------------------------------
-# 상단 글로벌 제어바 헤더
+# 상단 글로벌 제어바 헤더 (패딩 보정으로 완벽하게 노출됨)
 # ------------------------------------------------------------------
 title_col, btn_col = st.columns([4, 1])
 title_col.subheader("🖥️ 오피스 자율 좌석 배치 시스템")
 with btn_col:
     if st.button("🔄 초기화", key="reset_btn", use_container_width=True):
         reset_program()
+
+st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------
 # PC 전용 레이아웃 분할 (좌측 명단 2X9, 우측 엑셀 데이터 동적 표)

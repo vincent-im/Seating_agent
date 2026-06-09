@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import os
-import base64
+import base64  # ◀ 필수 라이브러리 추가 완료
 
 # 1. 반응형 웹 환경 설정
 st.set_page_config(
@@ -44,7 +44,7 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
 
-    /* 이미지 위에 랜덤하게 올라갈 이름표 스타일 (고대비 및 터치 감안) */
+    /* 이미지 위에 랜덤하게 올라갈 이름표 스타일 */
     .floating-name {
         position: absolute;
         transform: translate(-50%, -50%); /* 좌표의 정중앙에 이름이 오도록 정렬 */
@@ -82,7 +82,6 @@ if 'assignments' not in st.session_state:
     st.session_state.assignments = {}
 
 # 📍 좌석별 이미지 내 상대 위치 좌표 설정 (top: 위에서부터 %, left: 왼쪽에서부터 %)
-# 실제 사용하는 '좌석배치.png' 도면 속 책상 위치에 맞춰 이 퍼센트 숫자들을 미세 조정해 주세요.
 SEAT_COORDINATES = {
     # 1행 (A~F)
     'A': {'top': '12%', 'left': '18%'}, 'B': {'top': '12%', 'left': '32%'}, 'C': {'top': '12%', 'left': '45%'},
@@ -118,13 +117,76 @@ with left_panel:
     st.markdown("<h3>👥 팀 명단</h3>", unsafe_allow_html=True)
     
     if st.session_state.current_members:
-        # PC 환경: 가로 2열(2x9) 배열로 단정하게 표시
+        # PC 환경: 가로 2열(2x9) 배열
         st.markdown("<div class='pc-hint'>", unsafe_allow_html=True)
         pc_cols = st.columns(2)
         for idx, name in enumerate(st.session_state.current_members):
             col_target = pc_cols[idx % 2]
             if col_target.button(name, key=f"pc_{name}", use_container_width=True):
                 if available_seats:
-                    # ⭐ 핵심: 남아있는 빈 좌석 중 무작위로 하나를 선택(추첨)
                     chosen_seat = random.choice(available_seats)
-                    st.session_state.assignments[chosen_seat]
+                    st.session_state.assignments[chosen_seat] = name
+                    st.session_state.current_members.remove(name)
+                    st.rerun()
+                else:
+                    st.error("모든 좌석이 만석입니다!")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # 모바일 환경: 상단 배치용 가로 5열(5x4) 슬림 배열
+        st.markdown("<div class='mobile-hint'>", unsafe_allow_html=True)
+        mobile_cols = st.columns(5)
+        for idx, name in enumerate(st.session_state.current_members):
+            col_target = mobile_cols[idx % 5]
+            if col_target.button(name, key=f"mo_{name}", use_container_width=True):
+                if available_seats:
+                    chosen_seat = random.choice(available_seats)
+                    st.session_state.assignments[chosen_seat] = name
+                    st.session_state.current_members.remove(name)
+                    st.rerun()
+                else:
+                    st.error("모든 좌석이 만석입니다!")
+        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.success("🎉 모든 팀원의 좌석 배치가 완료되었습니다!")
+
+# --- [2] 우측 패널: 도면 이미지 및 실시간 랜덤 오버레이 영역 ---
+with right_panel:
+    st.markdown("<hr style='margin: 0.6rem 0;' class='mobile-hint'>", unsafe_allow_html=True)
+    title_space, reset_space = st.columns([3, 1])
+    title_space.markdown("<h3>🪑 실시간 배치도 (한눈에 보기)</h3>", unsafe_allow_html=True)
+    
+    with reset_space:
+        if st.button("🔄 전체 리셋", key="reset", use_container_width=True):
+            reset_all()
+            st.rerun()
+
+    image_path = "좌석배치.png"
+    if os.path.exists(image_path):
+        try:
+            # 💡 HTML 렌더링 시작
+            html_buffer = "<div class='image-container'>"
+            
+            # 배경 이미지 인라인 로드 (Base64 안전 인코딩)
+            with open(image_path, "rb") as img_file:
+                img_base64 = base64.b64encode(img_file.read()).decode()
+            html_buffer += f"<img src='data:image/png;base64,{img_base64}' class='bg-image' alt='사무실 좌석 배치도'>"
+            
+            # 실시간 랜덤 추첨 완료된 이름들 맵핑 레이어 생성
+            for seat, user_name in st.session_state.assignments.items():
+                if seat in SEAT_COORDINATES:
+                    pos = SEAT_COORDINATES[seat]
+                    class_type = "name-leader" if "팀장" in user_name else "name-member"
+                    
+                    html_buffer += f"""
+                        <div class='floating-name {class_type}' style='top: {pos["top"]}; left: {pos["left"]};'>
+                            {user_name}
+                        </div>
+                    """
+            html_buffer += "</div>"
+            
+            # 웹 브라우저 화면에 최종 주입
+            st.markdown(html_buffer, unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"이미지 처리 중 오류 발생: {e}")
+    else:
+        st.error(f"🚨 폴더 내에서 '{image_path}' 파일을 찾을 수 없습니다. 파일명을 정확히 확인해 주세요.")

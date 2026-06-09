@@ -165,10 +165,11 @@ def load_initial_members():
         try:
             df = pd.read_excel(file_name)
             names = df.iloc[:, 0].dropna().astype(str).tolist()
-            return [f"{name.strip()}(팀장)" if "김광녕" in name else name.strip() for name in names if name.strip()]
+            return [name.strip() for name in names if name.strip()]
         except:
             pass
-    return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
+    # '김광녕(팀장)' 문구를 '김광녕'으로 최종 수정 적용한 백업 리스트
+    return ["김광녕", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
 # 4. 좌석배치.xlsx 파일 분석 엔진 (A~S 가용 좌석만 추출)
@@ -290,7 +291,8 @@ with right_col:
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"
                 if assigned_user:
-                    style_class = "name-leader" if "팀장" in assigned_user else "name-member"
+                    # '김광녕'인 경우 노란색 강조 스타일(name-leader) 지정
+                    style_class = "name-leader" if "김광녕" in assigned_user else "name-member"
                     html_table += f"""
                     <div class='seat-slot-assigned'>
                         <span class='name-badge {style_class}'>{assigned_user}</span>

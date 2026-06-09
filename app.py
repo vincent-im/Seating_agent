@@ -10,10 +10,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. PC 및 모바일(가로 4열) 환경에 모두 대응하는 고도화된 CSS 주입
+# 2. 하나의 레이아웃 안에서 PC/모바일에 따라 차별화된 형태를 띄우기 위한 CSS 주입
 st.markdown("""
     <style>
-    /* 상단 여백 조절 및 전체 레이아웃 패딩 최적화 */
+    /* 상단 메뉴바 잘림 방지 패딩 확보 및 여백 최적화 */
     .block-container {
         padding-top: 4.5rem !important;
         padding-bottom: 1.5rem !important;
@@ -23,13 +23,61 @@ st.markdown("""
     
     /* 섹션 타이틀 서식 */
     .section-title { 
-        font-size: 1.25rem !important; 
+        font-size: 1.3rem !important; 
         font-weight: bold; 
-        margin-bottom: 0.8rem !important; 
+        margin-bottom: 1rem !important; 
         color: #2C3E50; 
     }
     
-    /* 💡 대기 명단 네모 박스 공통 스타일 */
+    /* 💡 [핵심] Streamlit 열(Column) 구조를 모바일에서 강제로 수평 4열 고정하는 기법 */
+    @media (max-width: 799px) {
+        /* 대기 명단 컨테이너를 가로 4열 격자로 강제 전환 */
+        [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+        }
+        /* 개별 버튼 박스가 가로 한 줄에 정확히 4개씩(25% 영역) 차지하도록 고정 */
+        [data-testid="stHorizontalBlock"] > div {
+            flex: 0 0 calc(25% - 5px) !important;
+            min-width: calc(25% - 5px) !important;
+            max-width: calc(25% - 5px) !important;
+            padding: 0 !important;
+        }
+        
+        /* 모바일용 버튼 크기 및 폰트 축소 */
+        div.stButton > button {
+            font-size: 0.75rem !important;
+            padding: 4px 2px !important;
+            min-height: 32px !important;
+            border-radius: 4px !important;
+        }
+        
+        /* 모바일 하단 배치도 압축 서식 (상하 10% 이상 축소 효과) */
+        .seat-table { border-spacing: 6px !important; }
+        .seat-table td { height: 55px !important; border-radius: 5px !important; }
+        .empty-row-space { height: 18px !important; }
+        .name-badge { font-size: 9.5px !important; padding: 2px 4px !important; }
+        .seat-label { font-size: 8px !important; margin-top: 1px !important; }
+        .unassigned-text { font-size: 0.85rem !important; }
+    }
+
+    /* [PC 환경 전용 스타일 서식: 너비 800px 이상] */
+    @media (min-width: 800px) {
+        div.stButton > button {
+            font-size: 0.95rem !important;
+            padding: 8px 5px !important;
+            min-height: 40px !important;
+            border-radius: 6px !important;
+        }
+        .seat-table { border-spacing: 12px; }
+        .seat-table td { height: 80px; }
+        .empty-row-space { height: 35px !important; }
+        .name-badge { font-size: 13px !important; padding: 5px 10px !important; }
+    }
+
+    /* 대기 명단 개별 네모 박스 공통 테두리 서식 */
     div.stButton > button {
         width: 100% !important;
         background-color: #ffffff !important;
@@ -44,45 +92,7 @@ st.markdown("""
         background-color: #f0f7ff !important;
     }
 
-    /* 💻 [PC 환경 전용 스타일: 너비 800px 이상] */
-    @media (min-width: 800px) {
-        .pc-layout { display: block; }
-        .mobile-layout { display: none; }
-        div.stButton > button {
-            font-size: 0.95rem !important;
-            padding: 8px 5px !important;
-            min-height: 40px !important;
-            border-radius: 6px !important;
-        }
-        .seat-table { border-spacing: 12px; }
-        .seat-table td { height: 80px; }
-        .empty-row-space { height: 35px !important; }
-        .name-badge { font-size: 13px !important; padding: 5px 10px !important; }
-    }
-
-    /* 📱 [모바일 환경 전용 스타일: 너비 799px 이하] */
-    @media (max-width: 799px) {
-        .pc-layout { display: none; }
-        .mobile-layout { display: block; }
-        
-        /* 모바일 상단 공간 절약을 위한 명단 단추 초소형화 */
-        div.stButton > button {
-            font-size: 0.75rem !important;
-            padding: 4px 2px !important;
-            min-height: 32px !important;
-            border-radius: 4px !important;
-        }
-        
-        /* 하단 배치도 공간 확보를 위한 표 간격 압축 (10% 이상 추가 축소) */
-        .seat-table { border-spacing: 6px !important; }
-        .seat-table td { height: 55px !important; border-radius: 5px !important; }
-        .empty-row-space { height: 18px !important; }
-        .name-badge { font-size: 9.5px !important; padding: 2px 4px !important; }
-        .seat-label { font-size: 8px !important; margin-top: 1px !important; }
-        .unassigned-text { font-size: 0.85rem !important; }
-    }
-
-    /* 엑셀 스타일 좌석 테이블 디자인 */
+    /* 엑셀 구조 렌더링용 테이블 디자인 */
     .seat-table {
         width: 100%;
         border-collapse: separate;
@@ -98,19 +108,11 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 세로 공백 행(완전 빈 행)을 위한 전용 스타일 */
-    .empty-row-space {
-        border: none !important;
-        background-color: transparent !important;
-    }
+    /* 세로 통로 및 빈 셀 스타일 */
+    .empty-row-space { border: none !important; background-color: transparent !important; }
+    .empty-space { border: none !important; background-color: transparent !important; }
     
-    /* 개별 가로 빈 칸 (통로, 기둥 등) 처리 */
-    .empty-space {
-        border: none !important;
-        background-color: transparent !important;
-    }
-    
-    /* 실제 배정된 좌석 슬롯의 스타일 */
+    /* 배정 완료된 이름표 슬롯 스타일 */
     .seat-slot-assigned {
         width: 100%;
         height: 100%;
@@ -123,7 +125,7 @@ st.markdown("""
         box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
     }
     
-    /* 이름표 뱃지 서식 및 배색 */
+    /* 이름표 뱃지 컬러 맵핑 */
     .name-badge {
         font-weight: bold !important;
         border-radius: 4px !important;
@@ -134,7 +136,6 @@ st.markdown("""
     .name-leader { background-color: #FFEB3B !important; color: #E65100 !important; border: 1.5px solid #E65100 !important; }
     .name-member { background-color: #2ECC71 !important; color: #FFFFFF !important; border: 1px solid #27AE60 !important; }
     
-    /* 슬롯 안의 원래 좌석 문자 투명도 조절 */
     .seat-label {
         font-size: 10px;
         color: #A0A0A0;
@@ -156,18 +157,14 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 좌석배치.xlsx 파일에서 구조(세로 공백 포함)를 가져오는 함수
+# 4. 좌석배치.xlsx 구조 분석 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
         try:
             df = pd.read_excel(file_name, header=None)
             df = df.fillna("")
-            
-            if hasattr(df, 'map'):
-                df = df.map(lambda x: str(x).strip())
-            else:
-                df = df.applymap(lambda x: str(x).strip())
+            df = df.map(lambda x: str(x).strip()) if hasattr(df, 'map') else df.applymap(lambda x: str(x).strip())
             
             seats = []
             for row in df.values:
@@ -178,7 +175,6 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 파일이 없을 경우 작동할 기본 백업 레이아웃
     backup_data = [
         ["A", "B", "C", "", "D", "E", "F"],
         ["", "", "", "", "", "", ""],         
@@ -187,11 +183,9 @@ def load_excel_layout():
         ["", "", "", "", "", "", ""],         
         ["R", "S", "T", "", "U", "V", "W"]
     ]
-    df_backup = pd.DataFrame(backup_data)
-    seats_backup = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W"]
-    return df_backup, seats_backup
+    return pd.DataFrame(backup_data), ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W"]
 
-# 5. 프로그램 초기 세션 및 레이아웃 데이터 로드
+# 5. 세션 관리 및 데이터 마운트
 layout_df, available_seats_list = load_excel_layout()
 
 if 'members' not in st.session_state:
@@ -201,7 +195,6 @@ if 'assignments' not in st.session_state:
 if 'available_seats' not in st.session_state:
     st.session_state.available_seats = available_seats_list.copy()
 
-# 6. 공통 배정 처리 함수
 def assign_seat(name):
     if st.session_state.available_seats:
         chosen_seat = random.choice(st.session_state.available_seats)
@@ -210,7 +203,6 @@ def assign_seat(name):
         st.session_state.members.remove(name)
         st.rerun()
 
-# 7. 리셋 로직
 def reset_program():
     _, fresh_seats = load_excel_layout()
     st.session_state.members = load_initial_members()
@@ -219,7 +211,7 @@ def reset_program():
     st.rerun()
 
 # ------------------------------------------------------------------
-# 상단 글로벌 제어바 헤더
+# 공통 레이아웃 헤더 (타이틀 및 초기화 버튼)
 # ------------------------------------------------------------------
 title_col, btn_col = st.columns([4, 1])
 title_col.subheader("🖥️ Security솔루션팀 좌석 배치 앱")
@@ -229,11 +221,31 @@ with btn_col:
 
 st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
+# ------------------------------------------------------------------
+# 단일 통합 반응형 레이아웃 뷰 가동
+# ------------------------------------------------------------------
+# PC에서는 화면 분할(1:2.5 비율)로 작동하고, 모바일에서는 자동으로 상하 적층 구도로 표현됩니다.
+left_col, right_col = st.columns([1, 2.5])
 
-# ------------------------------------------------------------------
-# 공통 테이블 빌더 (HTML 문자열 생성)
-# ------------------------------------------------------------------
-def build_html_table():
+# [명단 구역] - 접속 기기에 따라 2열 혹은 4열로 CSS가 차별화 제어합니다.
+with left_col:
+    st.markdown("<div class='section-title'>👥 명단</div>", unsafe_allow_html=True)
+    if st.session_state.members:
+        # 가로 4열 컴포넌트를 기본 바인딩하되, CSS 미디어 쿼리가 화면 크기를 감지하여 차별화합니다.
+        # PC(넓은 화면): 4열을 쓰더라도 left_col 폭이 좁으므로 자연스럽게 2줄씩 예쁘게 밀려 2열처럼 정착합니다.
+        # 모바일(좁은 화면): 아래 주입된 Flex CSS에 의해 억지로 세로로 풀리지 않고 무조건 가로 수평 4열 격자로 강제 유지됩니다.
+        grid_cols = st.columns(4)
+        for idx, name in enumerate(st.session_state.members):
+            col_target = grid_cols[idx % 4]
+            if col_target.button(name, key=f"member_{name}_{idx}", use_container_width=True):
+                assign_seat(name)
+    else:
+        st.success("모든 배정이 완료되었습니다!")
+
+# [좌석 별 배치 구역]
+with right_col:
+    st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
+    
     html_table = "<table class='seat-table'>"
     for r_idx, row in layout_df.iterrows():
         is_empty_row = all(cell_value == "" for cell_value in row)
@@ -260,47 +272,5 @@ def build_html_table():
                 html_table += "</td>"
         html_table += "</tr>"
     html_table += "</table>"
-    return html_table
-
-
-# ------------------------------------------------------------------
-# [1] PC 브라우저용 레이아웃 (좌측 명단 2X9, 우측 좌석 표)
-# ------------------------------------------------------------------
-st.markdown("<div class='pc-layout'>", unsafe_allow_html=True)
-pc_left, pc_right = st.columns([1, 2.5])
-
-with pc_left:
-    st.markdown("<div class='section-title'>👥 명단</div>", unsafe_allow_html=True)
-    if st.session_state.members:
-        pc_grid_cols = st.columns(2) # 💡 PC 가로 2열 배열
-        for idx, name in enumerate(st.session_state.members):
-            col_target = pc_grid_cols[idx % 2]
-            if col_target.button(name, key=f"pc_member_{name}_{idx}", use_container_width=True):
-                assign_seat(name)
-    else:
-        st.success("모든 배정이 완료되었습니다!")
-
-with pc_right:
-    st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
-    st.markdown(build_html_table(), unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ------------------------------------------------------------------
-# [2] 스마트폰 모바일용 레이아웃 (상단 명단 4X5, 하단 좌석 표 자동 압축)
-# ------------------------------------------------------------------
-st.markdown("<div class='mobile-layout'>", unsafe_allow_html=True)
-
-st.markdown("<div class='section-title'>👥 명단 (모바일)</div>", unsafe_allow_html=True)
-if st.session_state.members:
-    mobile_grid_cols = st.columns(4) # 💡 모바일 가로 4열 강제 배열 (4X5 격자 형성)
-    for idx, name in enumerate(st.session_state.members):
-        col_target = mobile_grid_cols[idx % 4]
-        if col_target.button(name, key=f"mo_member_{name}_{idx}", use_container_width=True):
-            assign_seat(name)
-else:
-    st.success("모든 배정이 완료되었습니다!")
-
-st.markdown("<br><div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
-st.markdown(build_html_table(), unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.markdown(html_table, unsafe_allow_html=True)

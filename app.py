@@ -3,17 +3,17 @@ import pandas as pd
 import random
 import os
 
-# 1. 화면 최적화 및 레이아웃 기본 설정
+# 1. 기본 화면 설정 및 가로폭 최대화
 st.set_page_config(
     page_title="Security솔루션팀 좌석 배치 앱",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 2. 하나의 레이아웃 안에서 PC/모바일에 따라 차별화된 형태를 띄우기 위한 CSS 주입
+# 2. 하나의 레이아웃 내부에서 PC(좌우) / 모바일(상하 + 명단 수평 4열)을 구현하는 핵심 CSS
 st.markdown("""
     <style>
-    /* 상단 메뉴바 잘림 방지 패딩 확보 및 여백 최적화 */
+    /* 상단 타이틀 메뉴 바 잘림 방지 및 기본 여백 최적화 */
     .block-container {
         padding-top: 4.5rem !important;
         padding-bottom: 1.5rem !important;
@@ -21,63 +21,15 @@ st.markdown("""
         padding-right: 1rem !important;
     }
     
-    /* 섹션 타이틀 서식 */
+    /* 섹션 타이틀 공통 서식 */
     .section-title { 
-        font-size: 1.3rem !important; 
+        font-size: 1.25rem !important; 
         font-weight: bold; 
-        margin-bottom: 1rem !important; 
+        margin-bottom: 0.8rem !important; 
         color: #2C3E50; 
     }
     
-    /* 💡 [핵심] Streamlit 열(Column) 구조를 모바일에서 강제로 수평 4열 고정하는 기법 */
-    @media (max-width: 799px) {
-        /* 대기 명단 컨테이너를 가로 4열 격자로 강제 전환 */
-        [data-testid="stHorizontalBlock"] {
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: wrap !important;
-            gap: 6px !important;
-        }
-        /* 개별 버튼 박스가 가로 한 줄에 정확히 4개씩(25% 영역) 차지하도록 고정 */
-        [data-testid="stHorizontalBlock"] > div {
-            flex: 0 0 calc(25% - 5px) !important;
-            min-width: calc(25% - 5px) !important;
-            max-width: calc(25% - 5px) !important;
-            padding: 0 !important;
-        }
-        
-        /* 모바일용 버튼 크기 및 폰트 축소 */
-        div.stButton > button {
-            font-size: 0.75rem !important;
-            padding: 4px 2px !important;
-            min-height: 32px !important;
-            border-radius: 4px !important;
-        }
-        
-        /* 모바일 하단 배치도 압축 서식 (상하 10% 이상 축소 효과) */
-        .seat-table { border-spacing: 6px !important; }
-        .seat-table td { height: 55px !important; border-radius: 5px !important; }
-        .empty-row-space { height: 18px !important; }
-        .name-badge { font-size: 9.5px !important; padding: 2px 4px !important; }
-        .seat-label { font-size: 8px !important; margin-top: 1px !important; }
-        .unassigned-text { font-size: 0.85rem !important; }
-    }
-
-    /* [PC 환경 전용 스타일 서식: 너비 800px 이상] */
-    @media (min-width: 800px) {
-        div.stButton > button {
-            font-size: 0.95rem !important;
-            padding: 8px 5px !important;
-            min-height: 40px !important;
-            border-radius: 6px !important;
-        }
-        .seat-table { border-spacing: 12px; }
-        .seat-table td { height: 80px; }
-        .empty-row-space { height: 35px !important; }
-        .name-badge { font-size: 13px !important; padding: 5px 10px !important; }
-    }
-
-    /* 대기 명단 개별 네모 박스 공통 테두리 서식 */
+    /* 대기 명단 개별 네모 박스 공통 서식 */
     div.stButton > button {
         width: 100% !important;
         background-color: #ffffff !important;
@@ -92,7 +44,61 @@ st.markdown("""
         background-color: #f0f7ff !important;
     }
 
-    /* 엑셀 구조 렌더링용 테이블 디자인 */
+    /* 💻 [PC 환경 전용 스타일: 너비 800px 이상] -> 좌우 레이아웃 최적화 */
+    @media (min-width: 800px) {
+        div.stButton > button {
+            font-size: 0.95rem !important;
+            padding: 8px 5px !important;
+            min-height: 40px !important;
+            border-radius: 6px !important;
+        }
+        .seat-table { border-spacing: 12px; }
+        .seat-table td { height: 80px; }
+        .empty-row-space { height: 35px !important; }
+        .name-badge { font-size: 13px !important; padding: 5px 10px !important; }
+    }
+
+    /* 📱 [모바일폰 환경 전용 스타일: 너비 799px 이하] -> 상하 레이아웃 및 4열 강제 고정 */
+    @media (max-width: 799px) {
+        /* 1. Streamlit의 좌우 컬럼 분할을 강제로 상하 적층(수직) 구도로 전환 */
+        [data-testid="stHorizontalBlock"] {
+            flex-direction: column !important;
+            gap: 1.5rem !important;
+        }
+        
+        /* 2. 명단 버튼들이 포함된 첫 번째 블록(명단 컨테이너)을 가로 수평 4열 격자로 강제 유지 */
+        [data-testid="stHorizontalBlock"] > div:first-child [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+        }
+        /* 개별 명단 버튼이 모바일에서 가로폭의 정확히 1/4(25%)씩 차지하도록 칼같이 고정 */
+        [data-testid="stHorizontalBlock"] > div:first-child [data-testid="stHorizontalBlock"] > div {
+            flex: 0 0 calc(25% - 5px) !important;
+            min-width: calc(25% - 5px) !important;
+            max-width: calc(25% - 5px) !important;
+            padding: 0 !important;
+        }
+        
+        /* 모바일용 버튼 콤팩트화 */
+        div.stButton > button {
+            font-size: 0.75rem !important;
+            padding: 4px 2px !important;
+            min-height: 32px !important;
+            border-radius: 4px !important;
+        }
+        
+        /* 하단 배치도 공간을 위한 10% 이상 상하 압축 */
+        .seat-table { border-spacing: 6px !important; }
+        .seat-table td { height: 55px !important; border-radius: 5px !important; }
+        .empty-row-space { height: 18px !important; }
+        .name-badge { font-size: 9.5px !important; padding: 2px 4px !important; }
+        .seat-label { font-size: 8px !important; margin-top: 1px !important; }
+        .unassigned-text { font-size: 0.85rem !important; }
+    }
+
+    /* 엑셀 구조 렌더링용 테이블 디자인 기본 서식 */
     .seat-table {
         width: 100%;
         border-collapse: separate;
@@ -108,11 +114,9 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 세로 통로 및 빈 셀 스타일 */
     .empty-row-space { border: none !important; background-color: transparent !important; }
     .empty-space { border: none !important; background-color: transparent !important; }
     
-    /* 배정 완료된 이름표 슬롯 스타일 */
     .seat-slot-assigned {
         width: 100%;
         height: 100%;
@@ -125,7 +129,6 @@ st.markdown("""
         box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
     }
     
-    /* 이름표 뱃지 컬러 맵핑 */
     .name-badge {
         font-weight: bold !important;
         border-radius: 4px !important;
@@ -144,7 +147,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 데이터 로드 함수 (명단.xlsx)
+# 3. 데이터 로드 함수 (명단.xlsx 지원)
 def load_initial_members():
     file_name = "명단.xlsx"
     if os.path.exists(file_name):
@@ -185,7 +188,7 @@ def load_excel_layout():
     ]
     return pd.DataFrame(backup_data), ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W"]
 
-# 5. 세션 관리 및 데이터 마운트
+# 5. 세션 관리 및 데이터 초기 마운트
 layout_df, available_seats_list = load_excel_layout()
 
 if 'members' not in st.session_state:
@@ -211,7 +214,7 @@ def reset_program():
     st.rerun()
 
 # ------------------------------------------------------------------
-# 공통 레이아웃 헤더 (타이틀 및 초기화 버튼)
+# 상단 글로벌 제어바 헤더
 # ------------------------------------------------------------------
 title_col, btn_col = st.columns([4, 1])
 title_col.subheader("🖥️ Security솔루션팀 좌석 배치 앱")
@@ -221,19 +224,21 @@ with btn_col:
 
 st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
+
 # ------------------------------------------------------------------
-# 단일 통합 반응형 레이아웃 뷰 가동
+# 단일 통합 레이아웃 가동 (PC: 좌우 자동 / 모바일: 상하 자동 전환)
 # ------------------------------------------------------------------
-# PC에서는 화면 분할(1:2.5 비율)로 작동하고, 모바일에서는 자동으로 상하 적층 구도로 표현됩니다.
+# left_col과 right_col이 PC에서는 1:2.5 비율의 좌우 배치로 서빙되며,
+# 모바일 브라우저로 진입하는 순간 CSS 미디어 쿼리가 이를 감지하여 유연하게 상하(수직)로 재정렬시킵니다.
 left_col, right_col = st.columns([1, 2.5])
 
-# [명단 구역] - 접속 기기에 따라 2열 혹은 4열로 CSS가 차별화 제어합니다.
+# [명단 영역]
 with left_col:
     st.markdown("<div class='section-title'>👥 명단</div>", unsafe_allow_html=True)
     if st.session_state.members:
-        # 가로 4열 컴포넌트를 기본 바인딩하되, CSS 미디어 쿼리가 화면 크기를 감지하여 차별화합니다.
-        # PC(넓은 화면): 4열을 쓰더라도 left_col 폭이 좁으므로 자연스럽게 2줄씩 예쁘게 밀려 2열처럼 정착합니다.
-        # 모바일(좁은 화면): 아래 주입된 Flex CSS에 의해 억지로 세로로 풀리지 않고 무조건 가로 수평 4열 격자로 강제 유지됩니다.
+        # 가로 4열 구조로 버튼을 그립니다.
+        # PC(넓은 화면): 좌측폭이 좁아 가로로 나열되다 2열씩 이쁘게 줄바꿈되어 2X9에 가깝게 정착합니다.
+        # 모바일(좁은 화면): 아래 주입된 Flex CSS에 의해 꺾이지 않고 가로 수평 4열(4X5 격자)을 칼같이 고정 유지합니다.
         grid_cols = st.columns(4)
         for idx, name in enumerate(st.session_state.members):
             col_target = grid_cols[idx % 4]
@@ -242,7 +247,7 @@ with left_col:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [좌석 별 배치 구역]
+# [좌석 별 배치 영역]
 with right_col:
     st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
     

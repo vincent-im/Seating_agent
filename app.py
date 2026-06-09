@@ -70,22 +70,37 @@ st.markdown("""
         display: block;
         border-radius: 6px;
     }
+    
+    /* ⭐ 핵심 수정: 이름표가 지정된 좌표의 '완벽한 정중앙'에 오도록 정렬 시스템 보완 */
     .floating-name {
         position: absolute;
-        transform: translate(-50%, -50%);
-        padding: 4px 8px;
+        top: 0;
+        left: 0;
+        transform: translate(-50%, -50%) !important; /* 내부 픽셀 오차 무력화 및 중앙 배치 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 10px;
         font-weight: bold;
         border-radius: 4px;
         text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.18);
         white-space: nowrap;
         pointer-events: none;
         z-index: 10;
     }
+    
+    @media (min-width: 800px) {
+        .floating-name {
+            font-size: 13px !important;
+            min-width: 65px;
+        }
+    }
     @media (max-width: 799px) {
         .floating-name {
-            font-size: 9px !important;
-            padding: 2px 4px !important;
+            font-size: 9.5px !important;
+            padding: 2px 5px !important;
+            min-width: 45px;
         }
     }
     .name-leader { background-color: #FFEB3B; color: #E65100; border: 1.5px solid #E65100; }
@@ -113,17 +128,15 @@ def load_initial_members():
     file_name = "명단.xlsx"
     if os.path.exists(file_name):
         try:
-            # 엑셀 파일 읽기 (첫 번째 열을 명단으로 인식)
             df = pd.read_excel(file_name)
             names = df.iloc[:, 0].dropna().astype(str).tolist()
             return [name.strip() for name in names if name.strip()]
         except:
             pass
-    # 파일이 없거나 오류 발생 시 기본 샘플 명단 출력
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 5. 세션 상태 캐싱 공간 초기화 (에러 방지의 핵심)
+# 5. 세션 상태 캐싱 공간 초기화
 if 'members' not in st.session_state:
     st.session_state.members = load_initial_members()
 if 'assignments' not in st.session_state:
@@ -153,7 +166,6 @@ def reset_program():
 title_col, btn_col = st.columns([4, 1])
 title_col.subheader("🖥️ 오피스 자율 좌석 배치 시스템")
 with btn_col:
-    # 화면 우측 상단에 배치되는 초기화 버튼
     if st.button("🔄 초기화", key="reset_btn", use_container_width=True):
         reset_program()
 
@@ -166,7 +178,6 @@ pc_left, pc_right = st.columns([1, 2.2])
 with pc_left:
     st.markdown("<h2>👥 선택 대기 명단</h2>", unsafe_allow_html=True)
     if st.session_state.members:
-        # 좌측에 정확히 2X9 배열 구조 생성
         pc_grid_cols = st.columns(2)
         for idx, name in enumerate(st.session_state.members):
             col_target = pc_grid_cols[idx % 2]
@@ -182,13 +193,13 @@ with pc_right:
         with open(image_path, "rb") as f:
             img_base64 = base64.b64encode(f.read()).decode()
         
-        # HTML 레이어를 통해 도면 위에 이름표 안착
         html_code = "<div class='image-container'>"
         html_code += f"<img src='data:image/png;base64,{img_base64}' class='bg-image'>"
         
         for seat, user_name in st.session_state.assignments.items():
             pos = SEAT_COORDINATES[seat]
             class_style = "name-leader" if "팀장" in user_name else "name-member"
+            # 개별 style 속성에 top과 left를 주입하여 정중앙 정렬 보장
             html_code += f"<div class='floating-name {class_style}' style='top:{pos['top']}; left:{pos['left']};'>{user_name}</div>"
         html_code += "</div>"
         st.markdown(html_code, unsafe_allow_html=True)
@@ -201,7 +212,6 @@ st.markdown("</div>", unsafe_allow_html=True)
 # ------------------------------------------------------------------
 st.markdown("<div class='mobile-layout'>", unsafe_allow_html=True)
 
-# [상단 배치] 명단 영역을 축소하여 4X5 배열 구조로 생성
 st.markdown("<h2>👥 선택 대기 명단 (모바일)</h2>", unsafe_allow_html=True)
 if st.session_state.members:
     mobile_grid_cols = st.columns(4)  # 4열 바둑판 배열
@@ -212,7 +222,6 @@ if st.session_state.members:
 else:
     st.success("모든 배정이 완료되었습니다!")
 
-# [하단 배치] 축소 동기화된 좌석배치 이미지 및 오버레이 이름표 위치
 st.markdown("<br><h2>🪑 실시간 배치 도면 (모바일)</h2>", unsafe_allow_html=True)
 if os.path.exists(image_path):
     with open(image_path, "rb") as f:

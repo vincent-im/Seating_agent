@@ -61,11 +61,11 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 💡 세로 공백 행(완전 빈 행)을 위한 전용 스타일 */
+    /* 세로 공백 행(완전 빈 행)을 위한 전용 스타일 */
     .empty-row-space {
         border: none !important;
         background-color: transparent !important;
-        height: 40px !important; /* 세로 공백 통로의 높이 조절 */
+        height: 40px !important; /* 세로 공백 통로의 높이 */
     }
     
     /* 개별 가로 빈 칸 (통로, 기둥 등) 처리 */
@@ -100,7 +100,7 @@ st.markdown("""
     .name-leader { background-color: #FFEB3B !important; color: #E65100 !important; border: 2px solid #E65100 !important; }
     .name-member { background-color: #2ECC71 !important; color: #FFFFFF !important; border: 1px solid #27AE60 !important; }
     
-    /* 슬롯 안의 원래 좌석 문자(A, B, C...) 투명도 조절 */
+    /* 슬롯 안의 원래 좌석 문자 투명도 조절 */
     .seat-label {
         font-size: 11px;
         color: #A0A0A0;
@@ -122,19 +122,20 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 💡 좌석배치.xlsx 파일에서 구조(세로 공백 포함)를 그대로 읽어오는 함수
+# 4. 💡 좌석배치.xlsx 파일에서 구조(세로 공백 포함)를 에러 없이 가져오는 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
         try:
-            # 엑셀의 빈 행(공백 행)도 생략하지 않고 온전히 읽어옵니다.
-            df = pd.read_excel(file_name, header=None, skipsearch=False)
-            df = df.fillna("") # 결측치를 빈 문자열로 일괄 변환
+            # 에러의 원인이었던 skipsearch 인자를 완전히 제거했습니다.
+            # 판다스는 기본적으로 중간의 빈 줄도 행 데이터로 그대로 읽어옵니다.
+            df = pd.read_excel(file_name, header=None)
+            df = df.fillna("") # 결측치를 빈 문자열로 변환
             
-            # 모든 셀의 텍스트 양 끝 공백 제거
+            # 모든 셀의 텍스트 양 끝 공백 처리
             df = df.applymap(lambda x: str(x).strip())
             
-            # 배정 대상이 될 실제 좌석 문자만 유효 풀(Pool)로 수집
+            # 배정 대상이 될 실제 좌석 문자만 풀(Pool)로 수집
             seats = []
             for row in df.values:
                 for val in row:
@@ -144,13 +145,13 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 파일이 없을 경우 기본 백업 레이아웃 (세로 공백이 반영된 6행 구조)
+    # 파일이 없을 경우 작동할 기본 백업 레이아웃
     backup_data = [
         ["A", "B", "C", "", "D", "E", "F"],
-        ["", "", "", "", "", "", ""],         # ◀ 세로 공백 행
+        ["", "", "", "", "", "", ""],         
         ["", "G", "H", "", "I", "J", "K"],
         ["L", "M", "N", "", "O", "P", "Q"],
-        ["", "", "", "", "", "", ""],         # ◀ 세로 공백 행
+        ["", "", "", "", "", "", ""],         
         ["R", "S", "T", "", "U", "V", "W"]
     ]
     df_backup = pd.DataFrame(backup_data)
@@ -210,27 +211,27 @@ with pc_left:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [우측] 💡 엑셀의 세로 공백 행까지 완벽하게 재현하는 테이블 드로잉 영역
+# [우측] 엑셀의 세로 공백 행까지 완벽하게 재현하는 테이블 드로잉 영역
 with pc_right:
     st.markdown("<div class='section-title'>🪑 실시간 배치 도면 (세로 통로 반영)</div>", unsafe_allow_html=True)
     
     html_table = "<table class='seat-table'>"
     
     for r_idx, row in layout_df.iterrows():
-        # 💡 해당 행 전체가 완전히 비어있는 행(세로 공백 행)인지 판별합니다.
+        # 해당 행 전체가 완전히 비어있는 행(세로 공백 행)인지 판별
         is_empty_row = all(cell_value == "" for cell_value in row)
         
         html_table += "<tr>"
         for c_idx, cell_value in enumerate(row):
             if is_empty_row:
-                # 행 전체가 비어있다면 높이가 축소된 투명한 세로 통로 공간으로 출력
+                # 완전히 비어있는 줄인 경우 넓고 투명한 세로 통로 공간으로 출력
                 html_table += f"<td class='empty-row-space' colspan='{len(row)}'></td>"
-                break # colspan을 적용했으므로 해당 행의 남은 열 처리는 건너뜁니다.
+                break
             elif cell_value == "":
-                # 행 내부의 개별 빈 셀 (가로 통로 분리선)
+                # 행 내부의 일반 빈 칸 (가로 통로 분리 구역)
                 html_table += "<td class='empty-space'></td>"
             else:
-                # 유효한 좌석 슬롯 맵핑
+                # 유효 좌석 슬롯 마운트
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"
                 if assigned_user:

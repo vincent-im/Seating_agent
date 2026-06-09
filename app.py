@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 엑셀 도면 서식(통로/X 마킹 검은색 박스)을 완벽히 구현하는 CSS 주입
+# 2. 엑셀의 모든 열과 X 마킹(검은색)을 완벽하게 구현하는 CSS 주입
 st.markdown("""
     <style>
     /* 상단 메뉴바 잘림 방지 및 전체 레이아웃 패딩 최적화 */
@@ -106,7 +106,7 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 💡 [요구사항 반영] 엑셀 내 X 표시 셀 전용 CSS 서식 (테두리가 있는 검은색 박스) */
+    /* 💡 [요구사항 반영] 엑셀 내 X 표시 셀 전용 서식 (테두리가 있는 선명한 검은색 박스) */
     .black-pillar-space {
         border: 1px solid #475569 !important; /* 명확한 사각형 테두리 */
         background-color: #1E293B !important; /* 딥 다크 블랙 색상 */
@@ -160,18 +160,19 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 좌석배치.xlsx 파일 분석 및 A~S 가용 좌석만 추출하는 엔진
+# 4. 좌석배치.xlsx 파일 전체 열을 누락 없이 그대로 로드하는 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
         try:
+            # 헤더 없이 원본 엑셀 전체를 온전하게 가져옵니다.
             df = pd.read_excel(file_name, header=None)
             df = df.fillna("")
             df = df.map(lambda x: str(x).strip()) if hasattr(df, 'map') else df.applymap(lambda x: str(x).strip())
             
-            # 💡 명단 매핑은 A(65)부터 S(83)까지 적힌 셀에만 철저하게 한정합니다.
+            # 💡 오직 A부터 S까지 적힌 셀만 명단 매핑 리스트(Pool)에 추가합니다.
             seats = []
-            valid_seat_letters = [chr(i) for i in range(65, 84)] 
+            valid_seat_letters = [chr(i) for i in range(65, 84)] # A(65) ~ S(83)
             
             for row in df.values:
                 for val in row:
@@ -181,6 +182,7 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
+    # 파일 탐색 실패 시 적용할 백업 데이터 셋
     backup_data = [
         ["A", "B", "C", "", "D", "E", "X"],
         ["", "", "", "", "", "", ""],         
@@ -191,7 +193,7 @@ def load_excel_layout():
     ]
     return pd.DataFrame(backup_data), ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S"]
 
-# 5. 세션 관리 및 데이터 초기 마운트
+# 5. 세션 관리 및 데이터 마운트
 layout_df, available_seats_list = load_excel_layout()
 
 if 'members' not in st.session_state:
@@ -244,7 +246,7 @@ with left_col:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [좌석 별 배치 영역]
+# [좌석 별 배치 영역] - 마지막 X 마킹 열까지 온전하게 7열 구조 전체를 렌더링
 with right_col:
     st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
     
@@ -261,10 +263,10 @@ with right_col:
                 html_table += f"<td class='empty-row-space' colspan='{len(row)}'></td>"
                 break
             elif cell_value == "X":
-                # 2. 💡 [요구사항 핵심]: 엑셀에 'X'라고 마킹된 셀은 테두리가 둘러싸인 검은색 구조물 박스로 변환
+                # 2. 💡 [핵심 교정]: 우측 열을 포함하여 엑셀에 'X'가 적힌 자리는 테두리가 둘러싸인 검은색 박스로 표현
                 html_table += "<td class='black-pillar-space'></td>"
             elif cell_value == "":
-                # 3. 세로 통로 라인 (4번째 열 등): 테두리 없는 투명 처리
+                # 3. 세로 통로 라인 (4번째 열): 테두리 없는 투명 처리
                 html_table += "<td class='empty-space'></td>"
             else:
                 # 4. 유효한 정상 배정 대상 좌석 슬롯 (A ~ S)

@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. PC(좌우) / 모바일(상하 + 명단 수평 4열 강제 고정) 및 콤팩트 화면 레이아웃 CSS 주입
+# 2. PC(좌우) / 모바일(상하 + 명단 수평 4열 강제 고정) 및 검은색 칸(기둥) 스타일 디자인 CSS 주입
 st.markdown("""
     <style>
     /* 상단 타이틀 메뉴 바 잘림 방지 및 기본 여백 최적화 */
@@ -114,6 +114,18 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
+    /* 💡 [요구사항 추가] 검은색 영역(기둥 또는 고정 벽) 전용 시각화 스타일 */
+    .pillar-space {
+        border: 1px solid #7F8C8D !important;
+        background-color: #555555 !important; /* 어두운 회색/검은색 계열로 기둥 표시 */
+        color: #FFFFFF !important;
+        font-size: 0.85rem;
+        border-radius: 8px;
+    }
+    @media (max-width: 799px) {
+        .pillar-space { font-size: 9px !important; }
+    }
+    
     .empty-row-space { border: none !important; background-color: transparent !important; }
     .empty-space { border: none !important; background-color: transparent !important; }
     
@@ -160,35 +172,37 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 💡 좌석배치.xlsx 파일에서 구조 분석 및 '가장 우측 열 제외' 필터링 처리 함수
+# 4. 좌석배치.xlsx 구조 분석 및 가장 우측 열 제외 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
         try:
             df = pd.read_excel(file_name, header=None)
             df = df.fillna("")
-            
-            # 버전에 따른 텍스트 양 끝 공백 일괄 정리
             df = df.map(lambda x: str(x).strip()) if hasattr(df, 'map') else df.applymap(lambda x: str(x).strip())
             
-            # ⭐ [핵심 요구사항 반영]: 데이터프레임의 가장 우측 열을 완전히 잘라냅니다 (Drop Last Column)
+            # 우측 열 제외 처리 규칙 유지
             if len(df.columns) > 0:
                 df = df.iloc[:, :-1]
                 
+            # 배정 풀(Pool)용 좌석 기호 수집
             seats = []
+            # 기둥이나 벽으로 선언할 텍스트 키워드들 목록 지정
+            pillar_keywords = ["기둥", "X", "막힘", "Pillar"]
+            
             for row in df.values:
                 for val in row:
-                    if val != "":
+                    # 빈칸이 아니고 기둥 키워드도 아닌 정상 좌석 문자(A~S)만 추출
+                    if val != "" and val not in pillar_keywords:
                         seats.append(val)
             return df, seats
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 파일이 없을 경우 작동할 기본 A~S 매핑 백업 레이아웃 (가장 우측열 제외 규격)
     backup_data = [
         ["A", "B", "C", "", "D", "E"],
         ["", "", "", "", "", ""],         
-        ["", "F", "G", "", "H", "I"],
+        ["기둥", "F", "G", "", "H", "I"], # 샘플용 기둥 매핑 예시
         ["J", "K", "L", "", "M", "N"],
         ["", "", "", "", "", ""],         
         ["O", "P", "Q", "", "R", "S"]
@@ -248,11 +262,13 @@ with left_col:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [좌석 별 배치 영역] - 우측 마지막 열이 탈락되어 더욱 가로 밸런스가 깔끔해집니다.
+# [좌석 별 배치 영역]
 with right_col:
     st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
     
     html_table = "<table class='seat-table'>"
+    pillar_keywords = ["기둥", "X", "막힘", "Pillar"] # 기둥 판별용 리스트
+    
     for r_idx, row in layout_df.iterrows():
         is_empty_row = all(cell_value == "" for cell_value in row)
         html_table += "<tr>"
@@ -262,6 +278,9 @@ with right_col:
                 break
             elif cell_value == "":
                 html_table += "<td class='empty-space'></td>"
+            elif cell_value in pillar_keywords:
+                # 💡 [요구사항 반영] 엑셀 셀 값이 기둥 키워드인 경우 매핑에서 제외하고 어두운 벽 구조로 렌더링
+                html_table += f"<td class='pillar-space'>{cell_value}</td>"
             else:
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"

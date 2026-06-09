@@ -122,18 +122,20 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 💡 좌석배치.xlsx 파일에서 구조(세로 공백 포함)를 에러 없이 가져오는 함수
+# 4. 좌석배치.xlsx 파일에서 구조(세로 공백 포함)를 가져오는 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
         try:
-            # 에러의 원인이었던 skipsearch 인자를 완전히 제거했습니다.
-            # 판다스는 기본적으로 중간의 빈 줄도 행 데이터로 그대로 읽어옵니다.
             df = pd.read_excel(file_name, header=None)
             df = df.fillna("") # 결측치를 빈 문자열로 변환
             
-            # 모든 셀의 텍스트 양 끝 공백 처리
-            df = df.applymap(lambda x: str(x).strip())
+            # 💡 [핵심 디버깅 구간] 판다스 버전에 따른 applymap 탈피 및 최신 map 엔진 도입
+            # 최신 버전 판다스에서는 applymap이 삭제되었으므로, 호환성을 위해 속성 체크 후 안전하게 스위칭합니다.
+            if hasattr(df, 'map'):
+                df = df.map(lambda x: str(x).strip())
+            else:
+                df = df.applymap(lambda x: str(x).strip())
             
             # 배정 대상이 될 실제 좌석 문자만 풀(Pool)로 수집
             seats = []

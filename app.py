@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import random
 import os
-import base64
 
 # 1. PC 화면 최적화 및 레이아웃 기본 설정
 st.set_page_config(
@@ -11,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 오차 없는 절대 정중앙 배치를 위한 CSS 주입
+# 2. 엑셀 기반 좌석 표(Table) 및 이름표 스타일 지정을 위한 CSS 주입
 st.markdown("""
     <style>
     /* 전체 레이아웃 패딩 최적화 */
@@ -44,92 +43,66 @@ st.markdown("""
         background-color: #f0f7ff !important;
     }
 
-    /* 독립 이미지 컨테이너 설정 */
-    .image-container {
-        position: relative !important;
-        width: 100% !important;
-        display: block !important;
-        margin: 0 auto !important;
-        padding: 0 !important;
+    /* 💡 엑셀 스타일 좌석 테이블 디자인 */
+    .seat-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 12px; /* 셀과 셀 사이의 통로 간격 */
+        table-layout: fixed;
     }
-    .bg-image {
-        width: 100% !important;
-        height: auto !important;
-        display: block !important;
+    .seat-table td {
+        border: 1px solid #E0E0E0;
+        border-radius: 8px;
+        height: 90px; /* 좌석 슬롯의 높이 */
+        text-align: center;
+        vertical-align: middle;
+        font-weight: bold;
+        position: relative;
+        background-color: #F8F9FA;
+    }
+    
+    /* 💡 실제 배정된 좌석 슬롯의 스타일 (정중앙 정렬 보장) */
+    .seat-slot-assigned {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
         border-radius: 6px;
-        margin: 0 !important;
-        padding: 0 !important;
+        padding: 4px;
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
     }
     
-    /* 이름표 뱃지를 좌석 사각형 슬롯의 완벽한 수평/수직 중간에 위치시키는 정렬법 */
-    .floating-name {
-        position: absolute !important;
-        display: inline-block !important;
-        transform: translate(-50%, -50%) !important; 
-        -webkit-transform: translate(-50%, -50%) !important;
-        -ms-transform: translate(-50%, -50%) !important;
-        
-        padding: 5px 10px !important;
+    /* 빈 공간 (통로, 기둥 등) 처리 */
+    .empty-space {
+        border: none !important;
+        background-color: transparent !important;
+    }
+    
+    /* 이름표 뱃지 서식 및 배색 */
+    .name-badge {
+        font-size: 14px !important;
         font-weight: bold !important;
-        font-size: 13px !important;
-        min-width: 75px !important;
+        padding: 6px 12px !important;
         border-radius: 4px !important;
-        text-align: center !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
-        white-space: nowrap !important;
-        pointer-events: none !important;
-        z-index: 999 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        display: inline-block;
+        white-space: nowrap;
     }
-    
-    /* 고대비 뱃지 컬러 서식 */
     .name-leader { background-color: #FFEB3B !important; color: #E65100 !important; border: 2px solid #E65100 !important; }
     .name-member { background-color: #2ECC71 !important; color: #FFFFFF !important; border: 1px solid #27AE60 !important; }
+    
+    /* 슬롯 안의 원래 좌석 문자(A, B, C...) 투명도 조절 */
+    .seat-label {
+        font-size: 11px;
+        color: #A0A0A0;
+        margin-top: 2px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 🎯 [동적 좌표 계산 시스템] 좌석배치.xlsx 파일에서 슬롯 위치를 읽어와 자동 비율화
-def load_seat_coordinates():
-    file_name = "좌석배치.xlsx"
-    coordinates = {}
-    
-    if os.path.exists(file_name):
-        try:
-            # 헤더 없이 모든 셀 데이터를 가져옵니다.
-            df = pd.read_excel(file_name, header=None)
-            total_rows = len(df)
-            total_cols = len(df.columns)
-            
-            for r_idx, row in df.iterrows():
-                for c_idx, val in enumerate(row):
-                    if pd.notna(val):
-                        seat_name = str(val).strip()
-                        if seat_name != "":
-                            # 엑셀 셀의 상대적 행/열 위치를 기반으로 정중앙 퍼센트(%) 좌표 생성
-                            # 여백 밸런스를 고려하여 정밀한 비율 분할을 적용합니다.
-                            top_ratio = ((r_idx + 0.5) / total_rows) * 100
-                            left_ratio = ((c_idx + 0.5) / total_cols) * 100
-                            
-                            coordinates[seat_name] = {
-                                'top': f"{round(top_ratio, 2)}%",
-                                'left': f"{round(left_ratio, 2)}%"
-                            }
-            return coordinates
-        except Exception as e:
-            st.sidebar.error(f"좌석배치.xlsx 로드 실패: {e}")
-            
-    # 파일이 없거나 에러 발생 시 최신 이미지 기준 백업 고정 좌표 작동
-    return {
-        'A': {'top': '8.2%', 'left': '18.4%'}, 'B': {'top': '8.2%', 'left': '31.6%'}, 'C': {'top': '8.2%', 'left': '44.9%'},
-        'D': {'top': '8.2%', 'left': '65.4%'}, 'E': {'top': '8.2%', 'left': '78.7%'}, 'F': {'top': '8.2%', 'left': '91.8%'},
-        'G': {'top': '42.0%', 'left': '31.6%'}, 'H': {'top': '42.0%', 'left': '44.9%'},
-        'I': {'top': '42.0%', 'left': '65.4%'}, 'J': {'top': '42.0%', 'left': '78.7%'}, 'K': {'top': '42.0%', 'left': '91.8%'},
-        'L': {'top': '58.8%', 'left': '18.4%'}, 'M': {'top': '58.8%', 'left': '31.6%'}, 'N': {'top': '58.8%', 'left': '44.9%'},
-        'O': {'top': '58.8%', 'left': '65.4%'}, 'P': {'top': '58.8%', 'left': '78.7%'}, 'Q': {'top': '58.8%', 'left': '91.8%'},
-        'R': {'top': '92.6%', 'left': '18.4%'}, 'S': {'top': '92.6%', 'left': '31.6%'}, 'T': {'top': '92.6%', 'left': '44.9%'},
-        'U': {'top': '92.6%', 'left': '65.4%'}, 'V': {'top': '92.6%', 'left': '78.7%'}, 'W': {'top': '92.6%', 'left': '91.8%'}
-    }
-
-# 4. 데이터 로드 함수 (명단.xlsx 지원)
+# 3. 데이터 로드 함수 (명단.xlsx)
 def load_initial_members():
     file_name = "명단.xlsx"
     if os.path.exists(file_name):
@@ -142,15 +115,45 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 5. 세션 상태 및 좌표 실시간 마운트
-SEAT_COORDINATES = load_seat_coordinates()
+# 4. 💡 좌석배치.xlsx 파일 읽기 및 가용한 알파벳 좌석 추출 함수
+def load_excel_layout():
+    file_name = "좌석배치.xlsx"
+    if os.path.exists(file_name):
+        try:
+            df = pd.read_excel(file_name, header=None)
+            # 파일 내부의 모든 값을 공백 제거하여 리스트 및 DF 형태로 보관
+            df = df.applymap(lambda x: str(x).strip() if pd.notna(x) else "")
+            
+            # 실제 배정 가능한 좌석 알파벳 리스트 추출
+            seats = []
+            for row in df.values:
+                for val in row:
+                    if val != "":
+                        seats.append(val)
+            return df, seats
+        except Exception as e:
+            st.error(f"좌석배치.xlsx 파싱 오류: {e}")
+            
+    # 파일이 없을 경우 기본 4x7 백업 테이블 레이아웃 자동 생성
+    backup_data = [
+        ["A", "B", "C", "", "D", "E", "F"],
+        ["", "G", "H", "", "I", "J", "K"],
+        ["L", "M", "N", "", "O", "P", "Q"],
+        ["R", "S", "T", "", "U", "V", "W"]
+    ]
+    df_backup = pd.DataFrame(backup_data)
+    seats_backup = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W"]
+    return df_backup, seats_backup
+
+# 5. 프로그램 초기 세션 및 레이아웃 데이터 로드
+layout_df, available_seats_list = load_excel_layout()
 
 if 'members' not in st.session_state:
     st.session_state.members = load_initial_members()
 if 'assignments' not in st.session_state:
     st.session_state.assignments = {}
 if 'available_seats' not in st.session_state:
-    st.session_state.available_seats = list(SEAT_COORDINATES.keys())
+    st.session_state.available_seats = available_seats_list.copy()
 
 # 6. 공통 배정 처리 함수
 def assign_seat(name):
@@ -163,13 +166,14 @@ def assign_seat(name):
 
 # 7. 리셋 로직
 def reset_program():
+    _, fresh_seats = load_excel_layout()
     st.session_state.members = load_initial_members()
     st.session_state.assignments = {}
-    st.session_state.available_seats = list(SEAT_COORDINATES.keys())
+    st.session_state.available_seats = fresh_seats
     st.rerun()
 
 # ------------------------------------------------------------------
-# 상단 글로벌 제어바 헤더 (타이틀 및 우측 상단 초기화 버튼)
+# 상단 글로벌 제어바 헤더
 # ------------------------------------------------------------------
 title_col, btn_col = st.columns([4, 1])
 title_col.subheader("🖥️ 오피스 자율 좌석 배치 시스템")
@@ -178,9 +182,9 @@ with btn_col:
         reset_program()
 
 # ------------------------------------------------------------------
-# PC 전용 레이아웃 분할 (좌측 명단 2X9, 우측 도면)
+# PC 전용 레이아웃 분할 (좌측 명단 2X9, 우측 엑셀 데이터 동적 표)
 # ------------------------------------------------------------------
-pc_left, pc_right = st.columns([1, 2.2])
+pc_left, pc_right = st.columns([1, 2.5])
 
 # [좌측] 선택 대기 명단 영역 (2X9 격자 배열)
 with pc_left:
@@ -194,24 +198,40 @@ with pc_left:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [우측] 실시간 배치 도면 영역 (엑셀 기반 자동 연동 구조)
+# [우측] 💡 엑셀 직접 파싱 및 실시간 HTML 테이블 드로잉 영역
 with pc_right:
-    st.markdown("<div class='section-title'>🪑 실시간 배치 도면</div>", unsafe_allow_html=True)
-    image_path = "좌석배치.png"
-    if os.path.exists(image_path):
-        with open(image_path, "rb") as f:
-            img_base64 = base64.b64encode(f.read()).decode()
-        
-        html_code = "<div class='image-container'>"
-        html_code += f"<img src='data:image/png;base64,{img_base64}' class='bg-image'>"
-        
-        # 엑셀 데이터로부터 계산된 동적 좌표 위에 이름표 매핑
-        for seat, user_name in st.session_state.assignments.items():
-            if seat in SEAT_COORDINATES:
-                pos = SEAT_COORDINATES[seat]
-                class_style = "name-leader" if "팀장" in user_name else "name-member"
-                html_code += f"<div class='floating-name {class_style}' style='top:{pos['top']}; left:{pos['left']};'>{user_name}</div>"
-        html_code += "</div>"
-        st.markdown(html_code, unsafe_allow_html=True)
-    else:
-        st.error("폴더에 '좌석배치.png' 파일이 존재하지 않습니다.")
+    st.markdown("<div class='section-title'>🪑 실시간 배치 도면 (Excel 동적 연동)</div>", unsafe_allow_html=True)
+    
+    # 엑셀의 형태를 완벽하게 유지하는 순수 HTML Table 생성 시작
+    html_table = "<table class='seat-table'>"
+    
+    for r_idx, row in layout_df.iterrows():
+        html_table += "<tr>"
+        for c_idx, cell_value in enumerate(row):
+            # 빈 셀인 경우 (통로나 기둥 영역)
+            if cell_value == "":
+                html_table += "<td class='empty-space'></td>"
+            else:
+                # 해당 자리에 사람이 배정되었는지 확인
+                assigned_user = st.session_state.assignments.get(cell_value, None)
+                
+                html_table += "<td>"
+                if assigned_user:
+                    # 사람이 있는 경우: 전용 컬러 뱃지로 정중앙 표시
+                    style_class = "name-leader" if "팀장" in assigned_user else "name-member"
+                    html_table += f"""
+                    <div class='seat-slot-assigned'>
+                        <span class='name-badge {style_class}'>{assigned_user}</span>
+                        <span class='seat-label'>좌석 {cell_value}</span>
+                    </div>
+                    """
+                else:
+                    # 사람이 아직 없는 경우: 연한 폰트로 좌석 기호만 중앙 표시
+                    html_table += f"<span style='color: #BCBCBC; font-size: 1.1rem;'>{cell_value}</span>"
+                html_table += "</td>"
+        html_table += "</tr>"
+    
+    html_table += "</table>"
+    
+    # 생성된 동적 HTML 테이블 마운트
+    st.markdown(html_table, unsafe_allow_html=True)

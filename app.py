@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 오차 없는 절대 정중앙 배치를 위한 CSS 주입 (PC 환경 전용)
+# 2. 오차 없는 절대 정중앙 배치를 위한 CSS 주입
 st.markdown("""
     <style>
     /* 전체 레이아웃 패딩 최적화 */
@@ -25,7 +25,7 @@ st.markdown("""
         color: #2C3E50; 
     }
     
-    /* 대기 명단 네모 박스 스타일 */
+    /* 대기 명단 네모 박스 스타일 (2X9 배열) */
     div.stButton > button {
         width: 100% !important;
         background-color: #ffffff !important;
@@ -87,24 +87,47 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 🎯 각 알파벳 슬롯 사각형의 수평/수직 정중앙 실측 좌표값
-SEAT_COORDINATES = {
-    # 1번째 줄 (A ~ F)
-    'A': {'top': '19.5%', 'left': '18.4%'}, 'B': {'top': '19.5%', 'left': '31.6%'}, 'C': {'top': '19.5%', 'left': '44.9%'},
-    'D': {'top': '19.5%', 'left': '65.4%'}, 'E': {'top': '19.5%', 'left': '78.7%'}, 'F': {'top': '19.5%', 'left': '91.8%'},
+# 3. 🎯 [동적 좌표 계산 시스템] 좌석배치.xlsx 파일에서 슬롯 위치를 읽어와 자동 비율화
+def load_seat_coordinates():
+    file_name = "좌석배치.xlsx"
+    coordinates = {}
     
-    # 2번째 줄 (G ~ K)
-    'G': {'top': '49.5%', 'left': '31.6%'}, 'H': {'top': '49.5%', 'left': '44.9%'},
-    'I': {'top': '49.5%', 'left': '65.4%'}, 'J': {'top': '49.5%', 'left': '78.7%'}, 'K': {'top': '49.5%', 'left': '91.8%'},
-    
-    # 3번째 줄 (L ~ Q)
-    'L': {'top': '64.2%', 'left': '18.4%'}, 'M': {'top': '64.2%', 'left': '31.6%'}, 'N': {'top': '64.2%', 'left': '44.9%'},
-    'O': {'top': '64.2%', 'left': '65.4%'}, 'P': {'top': '64.2%', 'left': '78.7%'}, 'Q': {'top': '64.2%', 'left': '91.8%'},
-    
-    # 4번째 줄 (R ~ W)
-    'R': {'top': '93.8%', 'left': '18.4%'}, 'S': {'top': '93.8%', 'left': '31.6%'}, 'T': {'top': '93.8%', 'left': '44.9%'},
-    'U': {'top': '93.8%', 'left': '65.4%'}, 'V': {'top': '93.8%', 'left': '78.7%'}, 'W': {'top': '93.8%', 'left': '91.8%'}
-}
+    if os.path.exists(file_name):
+        try:
+            # 헤더 없이 모든 셀 데이터를 가져옵니다.
+            df = pd.read_excel(file_name, header=None)
+            total_rows = len(df)
+            total_cols = len(df.columns)
+            
+            for r_idx, row in df.iterrows():
+                for c_idx, val in enumerate(row):
+                    if pd.notna(val):
+                        seat_name = str(val).strip()
+                        if seat_name != "":
+                            # 엑셀 셀의 상대적 행/열 위치를 기반으로 정중앙 퍼센트(%) 좌표 생성
+                            # 여백 밸런스를 고려하여 정밀한 비율 분할을 적용합니다.
+                            top_ratio = ((r_idx + 0.5) / total_rows) * 100
+                            left_ratio = ((c_idx + 0.5) / total_cols) * 100
+                            
+                            coordinates[seat_name] = {
+                                'top': f"{round(top_ratio, 2)}%",
+                                'left': f"{round(left_ratio, 2)}%"
+                            }
+            return coordinates
+        except Exception as e:
+            st.sidebar.error(f"좌석배치.xlsx 로드 실패: {e}")
+            
+    # 파일이 없거나 에러 발생 시 최신 이미지 기준 백업 고정 좌표 작동
+    return {
+        'A': {'top': '8.2%', 'left': '18.4%'}, 'B': {'top': '8.2%', 'left': '31.6%'}, 'C': {'top': '8.2%', 'left': '44.9%'},
+        'D': {'top': '8.2%', 'left': '65.4%'}, 'E': {'top': '8.2%', 'left': '78.7%'}, 'F': {'top': '8.2%', 'left': '91.8%'},
+        'G': {'top': '42.0%', 'left': '31.6%'}, 'H': {'top': '42.0%', 'left': '44.9%'},
+        'I': {'top': '42.0%', 'left': '65.4%'}, 'J': {'top': '42.0%', 'left': '78.7%'}, 'K': {'top': '42.0%', 'left': '91.8%'},
+        'L': {'top': '58.8%', 'left': '18.4%'}, 'M': {'top': '58.8%', 'left': '31.6%'}, 'N': {'top': '58.8%', 'left': '44.9%'},
+        'O': {'top': '58.8%', 'left': '65.4%'}, 'P': {'top': '58.8%', 'left': '78.7%'}, 'Q': {'top': '58.8%', 'left': '91.8%'},
+        'R': {'top': '92.6%', 'left': '18.4%'}, 'S': {'top': '92.6%', 'left': '31.6%'}, 'T': {'top': '92.6%', 'left': '44.9%'},
+        'U': {'top': '92.6%', 'left': '65.4%'}, 'V': {'top': '92.6%', 'left': '78.7%'}, 'W': {'top': '92.6%', 'left': '91.8%'}
+    }
 
 # 4. 데이터 로드 함수 (명단.xlsx 지원)
 def load_initial_members():
@@ -119,7 +142,9 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 5. 세션 상태 초기화
+# 5. 세션 상태 및 좌표 실시간 마운트
+SEAT_COORDINATES = load_seat_coordinates()
+
 if 'members' not in st.session_state:
     st.session_state.members = load_initial_members()
 if 'assignments' not in st.session_state:
@@ -169,7 +194,7 @@ with pc_left:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [우측] 실시간 배치 도면 영역
+# [우측] 실시간 배치 도면 영역 (엑셀 기반 자동 연동 구조)
 with pc_right:
     st.markdown("<div class='section-title'>🪑 실시간 배치 도면</div>", unsafe_allow_html=True)
     image_path = "좌석배치.png"
@@ -180,11 +205,12 @@ with pc_right:
         html_code = "<div class='image-container'>"
         html_code += f"<img src='data:image/png;base64,{img_base64}' class='bg-image'>"
         
-        # 실시간 레이어 이름표 오버레이 매핑 (정중앙 안착)
+        # 엑셀 데이터로부터 계산된 동적 좌표 위에 이름표 매핑
         for seat, user_name in st.session_state.assignments.items():
-            pos = SEAT_COORDINATES[seat]
-            class_style = "name-leader" if "팀장" in user_name else "name-member"
-            html_code += f"<div class='floating-name {class_style}' style='top:{pos['top']}; left:{pos['left']};'>{user_name}</div>"
+            if seat in SEAT_COORDINATES:
+                pos = SEAT_COORDINATES[seat]
+                class_style = "name-leader" if "팀장" in user_name else "name-member"
+                html_code += f"<div class='floating-name {class_style}' style='top:{pos['top']}; left:{pos['left']};'>{user_name}</div>"
         html_code += "</div>"
         st.markdown(html_code, unsafe_allow_html=True)
     else:

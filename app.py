@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. PC(좌우) / 모바일(상하 + 명단 4열 강제) 및 엑셀 검은색 셀(기둥/벽) 시각화 CSS 주입
+# 2. PC/모바일 반응형 레이아웃 및 검은색 셀 시각화 CSS 주입
 st.markdown("""
     <style>
     /* 상단 타이틀 메뉴 바 잘림 방지 및 전체 레이아웃 패딩 최적화 */
@@ -114,12 +114,11 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 💡 [핵심 요구사항 반영] 엑셀 내 검정색 셀(기둥/구조물) 표현용 CSS 고도화 */
+    /* 💡 [핵심 요구사항 반영] 엑셀 내 검정색 표시 셀 전용 CSS 서식 */
     .black-pillar-space {
-        border: 1px solid #333333 !important;
-        background-color: #2C3E50 !important; /* 세련된 딥 다크 검정 회색 계열 */
-        box-shadow: inset 0 0 10px rgba(0,0,0,0.5) !important;
-        color: #2C3E50 !important; /* 내부 텍스트 무력화 숨김 */
+        border: 1px solid #2C3E50 !important;
+        background-color: #2C3E50 !important; /* 세련된 딥 다크 검정 회색으로 화면 표시 */
+        box-shadow: inset 0 0 8px rgba(0,0,0,0.6) !important;
         border-radius: 8px;
     }
     
@@ -166,10 +165,10 @@ def load_initial_members():
             return [name.strip() for name in names if name.strip()]
         except:
             pass
-    return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
+    return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "イ병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 좌석배치.xlsx 구조 분석 및 검정색 셀 분리 추출 함수
+# 4. 좌석배치.xlsx 구조 분석 및 A~S 가용 좌석만 추출하는 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
@@ -178,31 +177,29 @@ def load_excel_layout():
             df = df.fillna("")
             df = df.map(lambda x: str(x).strip()) if hasattr(df, 'map') else df.applymap(lambda x: str(x).strip())
             
-            # 💡 엑셀 검정색 영역에 들어갈 수 있는 값 정의 (0, X, 기둥, 막힘 등 파싱)
-            black_cell_keywords = ["0", "0.0", "X", "x", "기둥", "막힘"]
-            
+            # 명확하게 가용 좌석 리스트 풀(Pool) 수집
             seats = []
             for row in df.values:
                 for val in row:
-                    # 완전 빈칸이 아니고, 검은색 지정 키워드도 아닌 실제 자릿수(A~S)만 랜덤 풀에 마운트
-                    if val != "" and val not in black_cell_keywords:
+                    # 빈 칸 및 기둥 표시용 텍스트(0 등)가 아닌 실제 수집된 좌석 기호(A~S)만 추출
+                    if val != "" and val not in ["0", "0.0", "X", "x", "기둥", "막힘"]:
                         seats.append(val)
             return df, seats
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 파일 손실 대응용 백업 레이아웃 기본 구조
+    # 파일 오프라인 대비 백업 데이터 셋
     backup_data = [
         ["A", "B", "C", "", "D", "E"],
         ["", "", "", "", "", ""],         
-        ["0", "F", "G", "", "H", "I"], # 샘플 검은색 셀(0) 테스트 케이스
+        ["", "F", "G", "", "H", "I"],
         ["J", "K", "L", "", "M", "N"],
         ["", "", "", "", "", ""],         
         ["O", "P", "Q", "", "R", "S"]
     ]
     return pd.DataFrame(backup_data), ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S"]
 
-# 5. 세션 관리 및 데이터 초기 바인딩
+# 5. 세션 관리 및 데이터 초기 마운트
 layout_df, available_seats_list = load_excel_layout()
 
 if 'members' not in st.session_state:
@@ -255,7 +252,7 @@ with left_col:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [좌석 별 배치 영역] - 엑셀 내부 검은색 구조물 자동 필터링 반영 영역
+# [좌석 별 배치 영역]
 with right_col:
     st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
     
@@ -263,17 +260,20 @@ with right_col:
     black_cell_keywords = ["0", "0.0", "X", "x", "기둥", "막힘"]
     
     for r_idx, row in layout_df.iterrows():
+        # 해당 행 전체가 통째로 비어있는 세로 통로 줄인지 판별
         is_empty_row = all(cell_value == "" for cell_value in row)
+        
         html_table += "<tr>"
         for c_idx, cell_value in enumerate(row):
             if is_empty_row:
+                # 완전 비어있는 가로 줄은 투명 통로로 렌더링
                 html_table += f"<td class='empty-row-space' colspan='{len(row)}'></td>"
                 break
             elif cell_value == "":
-                # 완전 비어있는 셀 = 투명 통로 처리
-                html_table += "<td class='empty-space'></td>"
+                # 💡 [핵심 사양 교정]: 좌석들이 배치된 행 내부에서 글자가 없는 칸은 '검은색 벽/기둥'으로 시각화
+                html_table += "<td class='black-pillar-space'></td>"
             elif cell_value in black_cell_keywords:
-                # 💡 [핵심 반영] 엑셀에서 검정색으로 마킹된 셀 발견 시 전용 다크 솔리드 스타일로 채움
+                # 엑셀 상에 0이나 X 등의 기호가 명시된 칸도 검은색 구조물로 처리
                 html_table += "<td class='black-pillar-space'></td>"
             else:
                 # 유효한 정상 배정 대상 좌석 슬롯 (A ~ S)

@@ -5,15 +5,15 @@ import os
 
 # 1. PC 화면 최적화 및 레이아웃 기본 설정
 st.set_page_config(
-    page_title="오피스 좌석 배치 프로그램",
+    page_title="Security솔루션팀 좌석 배치 앱",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 2. 엑셀 기반 좌석 표(Table) 및 잘림 방지 패딩 보정을 위한 CSS 주입
+# 2. 엑셀 기반 좌석 표(Table) 및 높이 축소(10%)를 위한 CSS 주입
 st.markdown("""
     <style>
-    /* 💡 [핵심 교정 단락] 상단 시스템 메뉴와 겹쳐 잘리는 현상을 막기 위해 여백을 4.5rem으로 늘림 */
+    /* 상단 여백 조절 및 전체 레이아웃 패딩 최적화 */
     .block-container {
         padding-top: 4.5rem !important;
         padding-bottom: 2rem !important;
@@ -23,9 +23,9 @@ st.markdown("""
     
     /* 섹션 타이틀 서식 */
     .section-title { 
-        font-size: 1.4rem !important; 
+        font-size: 1.3rem !important; /* 가독성을 위해 크기 살짝 조정 */
         font-weight: bold; 
-        margin-bottom: 1.2rem !important; 
+        margin-bottom: 1rem !important; 
         color: #2C3E50; 
     }
     
@@ -37,8 +37,8 @@ st.markdown("""
         border: 1px solid #dcdcdc !important;
         font-weight: 500 !important;
         font-size: 0.95rem !important;
-        padding: 10px 5px !important;
-        min-height: 45px !important;
+        padding: 8px 5px !important; /* 패딩을 살짝 줄여 상하 크기 축소 */
+        min-height: 40px !important; /* 최소 높이 축소 */
         border-radius: 6px !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
         transition: all 0.2s ease;
@@ -58,7 +58,7 @@ st.markdown("""
     .seat-table td {
         border: 1px solid #E0E0E0;
         border-radius: 8px;
-        height: 90px; /* 일반 좌석 슬롯의 높이 */
+        height: 80px; /* 💡 [높이 10% 축소] 기존 90px -> 80px로 변경하여 한 화면에 안착 */
         text-align: center;
         vertical-align: middle;
         font-weight: bold;
@@ -70,7 +70,7 @@ st.markdown("""
     .empty-row-space {
         border: none !important;
         background-color: transparent !important;
-        height: 40px !important; /* 세로 공백 통로의 높이 */
+        height: 35px !important; /* 💡 [높이 10% 축소] 기존 40px -> 35px로 축소 */
     }
     
     /* 개별 가로 빈 칸 (통로, 기둥 등) 처리 */
@@ -94,9 +94,9 @@ st.markdown("""
     
     /* 이름표 뱃지 서식 및 배색 */
     .name-badge {
-        font-size: 14px !important;
+        font-size: 13px !important; /* 폰트 크기 미세 축소 */
         font-weight: bold !important;
-        padding: 6px 12px !important;
+        padding: 5px 10px !important; /* 패딩 축소 */
         border-radius: 4px !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
         display: inline-block;
@@ -127,21 +127,19 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 좌석배치.xlsx 파일에서 구조(세로 공백 포함)를 가져오는 함수
+# 4. 좌석배치.xlsx 파일에서 구조를 가져오는 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
         try:
             df = pd.read_excel(file_name, header=None)
-            df = df.fillna("") # 결측치를 빈 문자열로 변환
+            df = df.fillna("")
             
-            # 호환성을 고려한 맵핑 함수 가동
             if hasattr(df, 'map'):
                 df = df.map(lambda x: str(x).strip())
             else:
                 df = df.applymap(lambda x: str(x).strip())
             
-            # 배정 대상이 될 실제 좌석 문자만 풀(Pool)로 수집
             seats = []
             for row in df.values:
                 for val in row:
@@ -151,7 +149,7 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 파일이 없을 경우 작동할 기본 백업 레이아웃
+    # 백업 레이아웃
     backup_data = [
         ["A", "B", "C", "", "D", "E", "F"],
         ["", "", "", "", "", "", ""],         
@@ -192,24 +190,26 @@ def reset_program():
     st.rerun()
 
 # ------------------------------------------------------------------
-# 상단 글로벌 제어바 헤더 (패딩 보정으로 완벽하게 노출됨)
+# 상단 글로벌 제어바 헤더 (타이틀 명칭 변경 반영)
 # ------------------------------------------------------------------
 title_col, btn_col = st.columns([4, 1])
-title_col.subheader("🖥️ 오피스 자율 좌석 배치 시스템")
+# 💡 메인 제목을 'Security솔루션팀 좌석 배치 앱'으로 변경
+title_col.subheader("🖥️ Security솔루션팀 좌석 배치 앱")
 with btn_col:
     if st.button("🔄 초기화", key="reset_btn", use_container_width=True):
         reset_program()
 
-st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------
 # PC 전용 레이아웃 분할 (좌측 명단 2X9, 우측 엑셀 데이터 동적 표)
 # ------------------------------------------------------------------
 pc_left, pc_right = st.columns([1, 2.5])
 
-# [좌측] 선택 대기 명단 영역 (2X9 격자 배열)
+# [좌측] 명단 영역 (타이틀 명칭 변경 반영)
 with pc_left:
-    st.markdown("<div class='section-title'>👥 선택 대기 명단</div>", unsafe_allow_html=True)
+    # 💡 서브 타이틀을 '명단'으로 변경
+    st.markdown("<div class='section-title'>👥 명단</div>", unsafe_allow_html=True)
     if st.session_state.members:
         pc_grid_cols = st.columns(2)
         for idx, name in enumerate(st.session_state.members):
@@ -219,27 +219,24 @@ with pc_left:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [우측] 엑셀의 세로 공백 행까지 완벽하게 재현하는 테이블 드로잉 영역
+# [우측] 좌석 별 배치 영역 (타이틀 명칭 변경 및 세로 축소 반영)
 with pc_right:
-    st.markdown("<div class='section-title'>🪑 실시간 배치 도면 (세로 통로 반영)</div>", unsafe_allow_html=True)
+    # 💡 서브 타이틀을 '좌석 별 배치'로 변경
+    st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
     
     html_table = "<table class='seat-table'>"
     
     for r_idx, row in layout_df.iterrows():
-        # 해당 행 전체가 완전히 비어있는 행(세로 공백 행)인지 판별
         is_empty_row = all(cell_value == "" for cell_value in row)
         
         html_table += "<tr>"
         for c_idx, cell_value in enumerate(row):
             if is_empty_row:
-                # 완전히 비어있는 줄인 경우 넓고 투명한 세로 통로 공간으로 출력
                 html_table += f"<td class='empty-row-space' colspan='{len(row)}'></td>"
                 break
             elif cell_value == "":
-                # 행 내부의 일반 빈 칸 (가로 통로 분리 구역)
                 html_table += "<td class='empty-space'></td>"
             else:
-                # 유효 좌석 슬롯 마운트
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"
                 if assigned_user:

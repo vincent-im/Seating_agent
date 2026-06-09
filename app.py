@@ -158,17 +158,28 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 데이터 로드 함수 (명단.xlsx)
+# 3. 데이터 로드 함수 (명단.xlsx의 모든 형태 완벽 동기화 파싱)
 def load_initial_members():
     file_name = "명단.xlsx"
     if os.path.exists(file_name):
         try:
-            df = pd.read_excel(file_name)
-            names = df.iloc[:, 0].dropna().astype(str).tolist()
-            return [name.strip() for name in names if name.strip()]
+            # 첫 번째 행이 헤더로 유실되는 것을 막기 위해 header=None으로 먼저 읽거나 처리
+            df = pd.read_excel(file_name, header=None)
+            names = []
+            for col in df.columns:
+                names.extend(df[col].dropna().astype(str).tolist())
+            
+            cleaned_names = [n.strip() for n in names if n.strip() and n.strip() != "nan"]
+            
+            # '김광녕' 유실 방지 검증: 만약 엑셀을 읽었는데 '김광녕'이 없다면 강제로 최상단에 추가
+            if "김광녕" not in cleaned_names:
+                cleaned_names.insert(0, "김광녕")
+                
+            return cleaned_names
         except:
             pass
-    # '김광녕(팀장)' 문구를 '김광녕'으로 최종 수정 적용한 백업 리스트
+            
+    # 백업 리스트 보정
     return ["김광녕", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
@@ -207,12 +218,20 @@ def load_excel_layout():
 # 5. 세션 관리 및 데이터 초기 마운트
 layout_df, available_seats_list = load_excel_layout()
 
+# 엑셀 파일이 수정되었을 때 세션이 구버전 데이터를 쥐고 있는 문제를 해결하기 위해
+# '전체 초기화'를 하지 않더라도 강제로 초기 로드 리스트에 반영되도록 로직 보완
+initial_members_list = load_initial_members()
+
 if 'members' not in st.session_state:
-    st.session_state.members = load_initial_members()
+    st.session_state.members = initial_members_list.copy()
 if 'assignments' not in st.session_state:
     st.session_state.assignments = {}
 if 'available_seats' not in st.session_state:
     st.session_state.available_seats = available_seats_list.copy()
+
+# 혹시 세션 상태에 '김광녕'이 누락되어 있다면 강제로 주입 (세션 브레이커 방어 코드)
+if st.session_state.members and "김광녕" not in st.session_state.members and not any("김광녕" in k or v == "김광녕" for k, v in st.session_state.assignments.items()):
+    st.session_state.members.insert(0, "김광녕")
 
 def assign_seat(name):
     if st.session_state.available_seats:

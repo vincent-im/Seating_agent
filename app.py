@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. PC/모바일 반응형 레이아웃 및 검은색 셀 시각화 CSS 주입
+# 2. 캡처 이미지 서식(통로/검은색 박스 구별)을 완벽 구현하는 CSS 주입
 st.markdown("""
     <style>
     /* 상단 타이틀 메뉴 바 잘림 방지 및 전체 레이아웃 패딩 최적화 */
@@ -44,7 +44,7 @@ st.markdown("""
         background-color: #f0f7ff !important;
     }
 
-    /* 💻 [PC 환경 전용 스타일: 너비 800px 이상] -> 좌우 레이아웃 최적화 */
+    /* 💻 [PC 환경 전용 스타일: 너비 800px 이상] */
     @media (min-width: 800px) {
         div.stButton > button {
             font-size: 0.95rem !important;
@@ -58,38 +58,30 @@ st.markdown("""
         .name-badge { font-size: 13px !important; padding: 5px 10px !important; }
     }
 
-    /* 📱 [모바일폰 환경 전용 스타일: 너비 799px 이하] -> 상하 레이아웃 및 4열 강제 고정 */
+    /* 📱 [모바일폰 환경 전용 스타일: 너비 799px 이하] */
     @media (max-width: 799px) {
-        /* Streamlit의 좌우 컬럼 분할을 강제로 상하 적층(수직) 구도로 전환 */
         [data-testid="stHorizontalBlock"] {
             flex-direction: column !important;
             gap: 1.5rem !important;
         }
-        
-        /* 명단 버튼들이 포함된 첫 번째 블록(명단 컨테이너)을 가로 수평 4열 격자로 강제 유지 */
         [data-testid="stHorizontalBlock"] > div:first-child [data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
             flex-wrap: wrap !important;
             gap: 6px !important;
         }
-        /* 개별 명단 버튼이 모바일에서 가로폭의 정확히 1/4(25%)씩 차지하도록 고정 */
         [data-testid="stHorizontalBlock"] > div:first-child [data-testid="stHorizontalBlock"] > div {
             flex: 0 0 calc(25% - 5px) !important;
             min-width: calc(25% - 5px) !important;
             max-width: calc(25% - 5px) !important;
             padding: 0 !important;
         }
-        
-        /* 모바일용 버튼 콤팩트화 */
         div.stButton > button {
             font-size: 0.75rem !important;
             padding: 4px 2px !important;
             min-height: 32px !important;
             border-radius: 4px !important;
         }
-        
-        /* 하단 배치도 공간을 위한 상하 압축 */
         .seat-table { border-spacing: 6px !important; }
         .seat-table td { height: 55px !important; border-radius: 5px !important; }
         .empty-row-space { height: 18px !important; }
@@ -114,14 +106,14 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 💡 [핵심 요구사항 반영] 엑셀 내 검정색 표시 셀 전용 CSS 서식 */
+    /* 💡 [요구사항 구현] 테두리가 명확하게 둘러싸인 검은색 셀 박스 (기둥/구조물) */
     .black-pillar-space {
-        border: 1px solid #2C3E50 !important;
-        background-color: #2C3E50 !important; /* 세련된 딥 다크 검정 회색으로 화면 표시 */
-        box-shadow: inset 0 0 8px rgba(0,0,0,0.6) !important;
+        border: 1px solid #475569 !important; /* 명확한 사각형 테두리 보장 */
+        background-color: #1E293B !important; /* 캡처와 유사한 딥 다크 블랙/네이비 색상 */
         border-radius: 8px;
     }
     
+    /* 💡 [요구사항 구현] 테두리가 아예 없는 투명한 가로/세로 통로 영역 */
     .empty-row-space { border: none !important; background-color: transparent !important; }
     .empty-space { border: none !important; background-color: transparent !important; }
     
@@ -165,10 +157,10 @@ def load_initial_members():
             return [name.strip() for name in names if name.strip()]
         except:
             pass
-    return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "イ병동", 
+    return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 좌석배치.xlsx 구조 분석 및 A~S 가용 좌석만 추출하는 함수
+# 4. 좌석배치.xlsx 구조 분석 및 A~S 가용 좌석만 정밀 추출하는 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
@@ -177,18 +169,16 @@ def load_excel_layout():
             df = df.fillna("")
             df = df.map(lambda x: str(x).strip()) if hasattr(df, 'map') else df.applymap(lambda x: str(x).strip())
             
-            # 명확하게 가용 좌석 리스트 풀(Pool) 수집
+            # 정확하게 가용 좌석 리스트 풀(Pool) 수집 (A~S 규격 필터)
             seats = []
             for row in df.values:
                 for val in row:
-                    # 빈 칸 및 기둥 표시용 텍스트(0 등)가 아닌 실제 수집된 좌석 기호(A~S)만 추출
                     if val != "" and val not in ["0", "0.0", "X", "x", "기둥", "막힘"]:
                         seats.append(val)
             return df, seats
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 파일 오프라인 대비 백업 데이터 셋
     backup_data = [
         ["A", "B", "C", "", "D", "E"],
         ["", "", "", "", "", ""],         
@@ -260,23 +250,23 @@ with right_col:
     black_cell_keywords = ["0", "0.0", "X", "x", "기둥", "막힘"]
     
     for r_idx, row in layout_df.iterrows():
-        # 해당 행 전체가 통째로 비어있는 세로 통로 줄인지 판별
+        # 해당 행 전체가 통째로 비어있는 세로 통로 구역인지 판별
         is_empty_row = all(cell_value == "" for cell_value in row)
         
         html_table += "<tr>"
         for c_idx, cell_value in enumerate(row):
             if is_empty_row:
-                # 완전 비어있는 가로 줄은 투명 통로로 렌더링
+                # 1. 행 전체가 빈 칸인 경우 테두리 없는 투명 통로 처리
                 html_table += f"<td class='empty-row-space' colspan='{len(row)}'></td>"
                 break
             elif cell_value == "":
-                # 💡 [핵심 사양 교정]: 좌석들이 배치된 행 내부에서 글자가 없는 칸은 '검은색 벽/기둥'으로 시각화
+                # 2. 💡 [핵심 사양 반영]: 일반 좌석 행 내부에 존재하는 빈 셀은 '테두리가 있는 검은색 박스'로 표현
                 html_table += "<td class='black-pillar-space'></td>"
             elif cell_value in black_cell_keywords:
-                # 엑셀 상에 0이나 X 등의 기호가 명시된 칸도 검은색 구조물로 처리
+                # 엑셀 데이터상 명시적 구조물 기호가 적힌 셀도 검은색 사각형 박스로 처리
                 html_table += "<td class='black-pillar-space'></td>"
             else:
-                # 유효한 정상 배정 대상 좌석 슬롯 (A ~ S)
+                # 3. 유효한 정상 배정 대상 좌석 슬롯 (A ~ S)
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"
                 if assigned_user:

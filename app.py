@@ -3,14 +3,14 @@ import pandas as pd
 import random
 import os
 
-# 1. 반응형 및 모바일 접근성을 위한 기본 페이지 설정
+# 1. 페이지 설정
 st.set_page_config(
-    page_title="팀 좌석 배치 에이전트 (도면 이미지 버전)", 
+    page_title="이미지 맵핑 좌석 배치 에이전트", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 인라인 CSS: PC와 모바일 환경에 따른 명단 배열 및 텍스트 톤 조절
+# 인라인 CSS: 이미지 위에 이름을 절대 좌표로 얹기 위한 핵심 스타일 스타일링
 st.markdown("""
     <style>
     .block-container {
@@ -19,63 +19,49 @@ st.markdown("""
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
     }
-    h1 { font-size: 1.6rem !important; margin-bottom: 0.1rem !important; text-align: center; }
+    h1 { font-size: 1.6rem !important; text-align: center; margin-bottom: 0.2rem; }
     .sub-title-text { font-size: 0.8rem; color: #7F8C8D; text-align: center; margin-bottom: 0.8rem; }
-    h3 { font-size: 1.1rem !important; margin-top: 0.4rem !important; margin-bottom: 0.3rem !important; }
+    h3 { font-size: 1.1rem !important; margin-bottom: 0.4rem !important; }
 
-    /* PC 환경 스타일 (화면 폭 800px 이상) */
-    @media (min-width: 800px) {
-        .pc-hint { display: block; }
-        .mobile-hint { display: none; }
-        div.stButton > button {
-            font-size: 0.9rem !important;
-            padding: 8px 4px !important;
-            min-height: 40px !important;
-            border-radius: 5px !important;
-        }
+    /* 반응형 명단 배열 제어 */
+    @media (min-width: 800px) { .pc-hint { display: block; } .mobile-hint { display: none; } }
+    @media (max-width: 799px) { .pc-hint { display: none; } .mobile-hint { display: block; } }
+
+    /* 이미지와 이름을 감싸는 컨테이너 (기준점) */
+    .image-container {
+        position: relative;
+        width: 100%;
+        display: inline-block;
     }
     
-    /* 모바일 환경 스타일 (화면 폭 800px 미만) */
-    @media (max-width: 799px) {
-        .pc-hint { display: none; }
-        .mobile-hint { display: block; }
-        div.stButton > button {
-            font-size: 0.73rem !important;
-            padding: 2px 1px !important;
-            min-height: 28px !important;
-            margin-bottom: 1px !important;
-            border-radius: 3px !important;
-        }
+    /* 도면 이미지 스타일 */
+    .bg-image {
+        width: 100%;
+        height: auto;
+        display: block;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
 
-    /* 배정 현황 보드 스타일 */
-    .status-board {
-        background-color: #F8F9FA;
-        border: 1px solid #E9ECEF;
-        border-radius: 6px;
-        padding: 10px;
-        margin-top: 5px;
-    }
-    .status-item {
-        display: inline-block;
+    /* 이미지 위에 올라갈 이름표 서식 (고대비 및 가독성 확보) */
+    .floating-name {
+        position: absolute;
+        transform: translate(-50%, -50%); /* 지정 좌표의 정중앙에 이름이 오도록 설정 */
         padding: 4px 8px;
-        margin: 2px;
-        background-color: #E8F5E9;
-        color: #2E7D32;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: bold;
         border-radius: 4px;
-        border: 1px solid #A5D6A7;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        white-space: nowrap;
+        pointer-events: none; /* 마우스 클릭 방해 금지 */
     }
-    .status-item-leader {
-        background-color: #FFF3E0;
-        color: #D84315;
-        border: 1px solid #FFCC80;
-    }
+    .name-leader { background-color: #FFEB3B; color: #E65100; border: 2px solid #E65100; }
+    .name-member { background-color: #2ECC71; color: #FFFFFF; border: 1px solid #27AE60; }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 데이터 로드 및 초기화 구조 정의
+# 2. 데이터 로드 및 초기화
 def load_member_list():
     file_name = "명단.xlsx"
     if os.path.exists(file_name):
@@ -83,10 +69,9 @@ def load_member_list():
             df = pd.read_excel(file_name)
             names = df.iloc[:, 0].dropna().astype(str).tolist()
             return [name.strip() for name in names if name.strip()]
-        except Exception as e:
+        except:
             return [f"팀원{i}" for i in range(1, 19)]
-    else:
-        return [f"홍길동{i}" for i in range(1, 19)]
+    return [f"홍길동{i}" for i in range(1, 19)]
 
 if 'original_members' not in st.session_state:
     st.session_state.original_members = load_member_list()
@@ -95,14 +80,24 @@ if 'current_members' not in st.session_state:
 if 'assignments' not in st.session_state:
     st.session_state.assignments = {}
 
-# 고정된 좌석 알파벳 풀 (G 기둥 제외, 마지막 칸 W)
-seat_structure = [
-    ["A", "B", "C", "", "D", "E", "F"],
-    ["기둥", "G", "H", "", "I", "J", "K"], 
-    ["L", "M", "N", "", "O", "P", "Q"],   
-    ["R", "S", "T", "", "U", "V", "W"]
-]
-all_valid_seats = [cell for row in seat_structure for cell in row if cell and cell != "기둥"]
+# 📍 [핵심 수정 구간] 좌석별 이미지 내 상대 좌표 설정 (top: 위에서부터 %, left: 왼쪽에서부터 %)
+# 실제 좌석배치.png 이미지의 해상도와 위치에 맞게 이 숫자를 자유롭게 튜닝해 주세요!
+SEAT_COORDINATES = {
+    # 1행 (A~F)
+    'A': {'top': '12%', 'left': '18%'}, 'B': {'top': '12%', 'left': '32%'}, 'C': {'top': '12%', 'left': '45%'},
+    'D': {'top': '12%', 'left': '65%'}, 'E': {'top': '12%', 'left': '78%'}, 'F': {'top': '12%', 'left': '91%'},
+    # 3행 (G~K) -> 기존 G 자리는 기둥이므로 수동 조정 시 기둥 위치는 제외
+    'G': {'top': '42%', 'left': '32%'}, 'H': {'top': '42%', 'left': '45%'},
+    'I': {'top': '42%', 'left': '65%'}, 'J': {'top': '42%', 'left': '78%'}, 'K': {'top': '42%', 'left': '91%'},
+    # 4행 (L~Q)
+    'L': {'top': '58%', 'left': '18%'}, 'M': {'top': '58%', 'left': '32%'}, 'N': {'top': '58%', 'left': '45%'},
+    'O': {'top': '58%', 'left': '65%'}, 'P': {'top': '58%', 'left': '78%'}, 'Q': {'top': '58%', 'left': '91%'},
+    # 6행 (R~W)
+    'R': {'top': '88%', 'left': '18%'}, 'S': {'top': '88%', 'left': '32%'}, 'T': {'top': '88%', 'left': '45%'},
+    'U': {'top': '88%', 'left': '65%'}, 'V': {'top': '88%', 'left': '78%'}, 'W': {'top': '88%', 'left': '91%'}
+}
+
+all_valid_seats = list(SEAT_COORDINATES.keys())
 assigned_seats = list(st.session_state.assignments.keys())
 available_seats = [s for s in all_valid_seats if s not in assigned_seats]
 
@@ -110,26 +105,23 @@ def reset_all():
     st.session_state.current_members = st.session_state.original_members.copy()
     st.session_state.assignments = {}
 
-# --- 레이아웃 타이틀 ---
-st.markdown("<h1>🖥️ 하이브리드 팀 좌석 배치 에이전트</h1>", unsafe_allow_html=True)
-st.markdown("<div class='sub-title-text'>배치도 도면 이미지를 기반으로 무작위 좌석 배정을 진행합니다.</div>", unsafe_allow_html=True)
+# --- 레이아웃 드로잉 ---
+st.markdown("<h1>🖥️ 이미지 맵핑 팀 좌석 배치 에이전트</h1>", unsafe_allow_html=True)
+st.markdown("<div class='sub-title-text'>명단을 터치하면 실제 도면 이미지 위에 이름이 오버레이됩니다.</div>", unsafe_allow_html=True)
 
-# PC 뷰에서는 좌우 구조 / 모바일 뷰에서는 상하 구조 자동 전환
 left_panel, right_panel = st.columns([1, 1.8])
 
-# -------------------------------------------------------------
-# [1] 좌측 패널: 팀 명단 영역
-# -------------------------------------------------------------
+# --- [1] 좌측 명단 패널 ---
 with left_panel:
     st.markdown("<h3>👥 팀 명단</h3>", unsafe_allow_html=True)
     
     if st.session_state.current_members:
-        # PC 환경용 2x9 격자 배열
+        # PC용 2x9 격자
         st.markdown("<div class='pc-hint'>", unsafe_allow_html=True)
         pc_cols = st.columns(2)
         for idx, name in enumerate(st.session_state.current_members):
             col_target = pc_cols[idx % 2]
-            if col_target.button(name, key=f"pc_btn_{name}", use_container_width=True):
+            if col_target.button(name, key=f"pc_{name}", use_container_width=True):
                 if available_seats:
                     chosen_seat = random.choice(available_seats)
                     st.session_state.assignments[chosen_seat] = name
@@ -137,12 +129,12 @@ with left_panel:
                     st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
         
-        # 모바일 환경용 5x4 격자 배열
+        # 모바일용 5x4 격자
         st.markdown("<div class='mobile-hint'>", unsafe_allow_html=True)
         mobile_cols = st.columns(5)
         for idx, name in enumerate(st.session_state.current_members):
             col_target = mobile_cols[idx % 5]
-            if col_target.button(name, key=f"mo_btn_{name}", use_container_width=True):
+            if col_target.button(name, key=f"mo_{name}", use_container_width=True):
                 if available_seats:
                     chosen_seat = random.choice(available_seats)
                     st.session_state.assignments[chosen_seat] = name
@@ -152,42 +144,45 @@ with left_panel:
     else:
         st.success("🎉 모든 팀원 배치가 완료되었습니다!")
 
-    # 실시간 배정 명단 텍스트 보드 (웹 접근성 보완 및 이미지 보조용)
-    st.markdown("<h3>📊 실시간 배정 현황 리스트</h3>", unsafe_allow_html=True)
-    if st.session_state.assignments:
-        html_status = "<div class='status-board'>"
-        # 좌석 이름 순으로 정렬해서 표시
-        for seat in sorted(st.session_state.assignments.keys()):
-            user_name = st.session_state.assignments[seat]
-            style_class = "status-item status-item-leader" if "팀장" in user_name else "status-item"
-            html_status += f"<span class='{style_class}'>{seat}: {user_name}</span>"
-        html_status += "</div>"
-        st.markdown(html_status, unsafe_allow_html=True)
-    else:
-        st.caption("아직 배정된 좌석이 없습니다.")
-
-# -------------------------------------------------------------
-# [2] 우측 패널: 좌석배치도 그림 출력 영역
-# -------------------------------------------------------------
+# --- [2] 우측 도면 이미지 오버레이 패널 ---
 with right_panel:
     st.markdown("<hr style='margin: 0.6rem 0;' class='mobile-hint'>", unsafe_allow_html=True)
-    
     title_space, reset_space = st.columns([3, 1])
-    title_space.markdown("<h3>🪑 오피스 좌석 도면</h3>", unsafe_allow_html=True)
+    title_space.markdown("<h3>🪑 실시간 배치도 (한눈에 보기)</h3>", unsafe_allow_html=True)
     
     with reset_space:
-        if st.button("🔄 전체 리셋", key="global_reset", use_container_width=True):
+        if st.button("🔄 전체 리셋", key="reset", use_container_width=True):
             reset_all()
             st.rerun()
 
-    # 이미지 로드 및 오류 검증 처리
     image_path = "좌석배치.png"
     if os.path.exists(image_path):
-        # PC와 모바일 화면폭에 맞춰 자동으로 꽉 차게 렌더링 (use_container_width=True)
-        st.image(image_path, caption="참조용 좌석배치도 도면", use_container_width=True)
+        # 💡 HTML 렌더링 엔진 가동: 이미지 위에 절대좌표로 이름표 띄우기
+        html_buffer = f"<div class='image-container'>"
+        
+        # 기본 배경 이미지 레이어
+        # 배포 주소 및 로컬 환경에서 이미지를 인라인으로 동적 호출하기 위해 streamlit의 static 서빙 방식을 간접 이용하거나 
+        # 간단히 로컬 이미지를 웹 브라우저가 그리도록 구성
+        import base64
+        with open(image_path, "rb") as img_file:
+            img_base64 = base64.b64encode(img_file.read()).decode()
+        html_buffer += f"<img src='data:image/png;base64,{img_base64}' class='bg-image' alt='사무실 도면'>"
+        
+        # 배정된 이름들 실시간 오버레이 레이어
+        for seat, user_name in st.session_state.assignments.items():
+            if seat in SEAT_COORDINATES:
+                pos = SEAT_COORDINATES[seat]
+                class_type = "name-leader" if "팀장" in user_name else "name-member"
+                
+                # 각 알파벳 좌표값에 맞춰 div 뱃지를 생성
+                html_buffer += f"""
+                    <div class='floating-name {class_type}' style='top: {pos["top"]}; left: {pos["left"]};'>
+                        {user_name}
+                    </div>
+                """
+        html_buffer += "</div>"
+        
+        # 디자인된 HTML 컴포넌트를 브라우저에 주입
+        st.markdown(html_buffer, unsafe_allow_html=True)
     else:
-        st.error(
-            f"🚨 '{image_path}' 파일을 찾을 수 없습니다.\n\n"
-            "파워포인트 파일의 좌석 배치도 그림을 PNG로 저장하여 "
-            "이 프로그램 파일과 같은 폴더에 넣어주세요."
-        )
+        st.error(f"🚨 폴더 내에서 '{image_path}' 파일을 찾을 수 없습니다. 이미지를 추가해 주세요.")

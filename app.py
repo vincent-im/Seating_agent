@@ -43,17 +43,17 @@ st.markdown("""
         background-color: #f0f7ff !important;
     }
 
-    /* 💡 엑셀 스타일 좌석 테이블 디자인 */
+    /* 엑셀 스타일 좌석 테이블 디자인 */
     .seat-table {
         width: 100%;
         border-collapse: separate;
-        border-spacing: 12px; /* 셀과 셀 사이의 통로 간격 */
+        border-spacing: 12px; /* 셀과 셀 사이의 가로 통로 간격 */
         table-layout: fixed;
     }
     .seat-table td {
         border: 1px solid #E0E0E0;
         border-radius: 8px;
-        height: 90px; /* 좌석 슬롯의 높이 */
+        height: 90px; /* 일반 좌석 슬롯의 높이 */
         text-align: center;
         vertical-align: middle;
         font-weight: bold;
@@ -61,7 +61,20 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 💡 실제 배정된 좌석 슬롯의 스타일 (정중앙 정렬 보장) */
+    /* 💡 세로 공백 행(완전 빈 행)을 위한 전용 스타일 */
+    .empty-row-space {
+        border: none !important;
+        background-color: transparent !important;
+        height: 40px !important; /* 세로 공백 통로의 높이 조절 */
+    }
+    
+    /* 개별 가로 빈 칸 (통로, 기둥 등) 처리 */
+    .empty-space {
+        border: none !important;
+        background-color: transparent !important;
+    }
+    
+    /* 실제 배정된 좌석 슬롯의 스타일 */
     .seat-slot-assigned {
         width: 100%;
         height: 100%;
@@ -72,12 +85,6 @@ st.markdown("""
         border-radius: 6px;
         padding: 4px;
         box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
-    }
-    
-    /* 빈 공간 (통로, 기둥 등) 처리 */
-    .empty-space {
-        border: none !important;
-        background-color: transparent !important;
     }
     
     /* 이름표 뱃지 서식 및 배색 */
@@ -115,16 +122,19 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 💡 좌석배치.xlsx 파일 읽기 및 가용한 알파벳 좌석 추출 함수
+# 4. 💡 좌석배치.xlsx 파일에서 구조(세로 공백 포함)를 그대로 읽어오는 함수
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
         try:
-            df = pd.read_excel(file_name, header=None)
-            # 파일 내부의 모든 값을 공백 제거하여 리스트 및 DF 형태로 보관
-            df = df.applymap(lambda x: str(x).strip() if pd.notna(x) else "")
+            # 엑셀의 빈 행(공백 행)도 생략하지 않고 온전히 읽어옵니다.
+            df = pd.read_excel(file_name, header=None, skipsearch=False)
+            df = df.fillna("") # 결측치를 빈 문자열로 일괄 변환
             
-            # 실제 배정 가능한 좌석 알파벳 리스트 추출
+            # 모든 셀의 텍스트 양 끝 공백 제거
+            df = df.applymap(lambda x: str(x).strip())
+            
+            # 배정 대상이 될 실제 좌석 문자만 유효 풀(Pool)로 수집
             seats = []
             for row in df.values:
                 for val in row:
@@ -134,11 +144,13 @@ def load_excel_layout():
         except Exception as e:
             st.error(f"좌석배치.xlsx 파싱 오류: {e}")
             
-    # 파일이 없을 경우 기본 4x7 백업 테이블 레이아웃 자동 생성
+    # 파일이 없을 경우 기본 백업 레이아웃 (세로 공백이 반영된 6행 구조)
     backup_data = [
         ["A", "B", "C", "", "D", "E", "F"],
+        ["", "", "", "", "", "", ""],         # ◀ 세로 공백 행
         ["", "G", "H", "", "I", "J", "K"],
         ["L", "M", "N", "", "O", "P", "Q"],
+        ["", "", "", "", "", "", ""],         # ◀ 세로 공백 행
         ["R", "S", "T", "", "U", "V", "W"]
     ]
     df_backup = pd.DataFrame(backup_data)
@@ -198,26 +210,30 @@ with pc_left:
     else:
         st.success("모든 배정이 완료되었습니다!")
 
-# [우측] 💡 엑셀 직접 파싱 및 실시간 HTML 테이블 드로잉 영역
+# [우측] 💡 엑셀의 세로 공백 행까지 완벽하게 재현하는 테이블 드로잉 영역
 with pc_right:
-    st.markdown("<div class='section-title'>🪑 실시간 배치 도면 (Excel 동적 연동)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>🪑 실시간 배치 도면 (세로 통로 반영)</div>", unsafe_allow_html=True)
     
-    # 엑셀의 형태를 완벽하게 유지하는 순수 HTML Table 생성 시작
     html_table = "<table class='seat-table'>"
     
     for r_idx, row in layout_df.iterrows():
+        # 💡 해당 행 전체가 완전히 비어있는 행(세로 공백 행)인지 판별합니다.
+        is_empty_row = all(cell_value == "" for cell_value in row)
+        
         html_table += "<tr>"
         for c_idx, cell_value in enumerate(row):
-            # 빈 셀인 경우 (통로나 기둥 영역)
-            if cell_value == "":
+            if is_empty_row:
+                # 행 전체가 비어있다면 높이가 축소된 투명한 세로 통로 공간으로 출력
+                html_table += f"<td class='empty-row-space' colspan='{len(row)}'></td>"
+                break # colspan을 적용했으므로 해당 행의 남은 열 처리는 건너뜁니다.
+            elif cell_value == "":
+                # 행 내부의 개별 빈 셀 (가로 통로 분리선)
                 html_table += "<td class='empty-space'></td>"
             else:
-                # 해당 자리에 사람이 배정되었는지 확인
+                # 유효한 좌석 슬롯 맵핑
                 assigned_user = st.session_state.assignments.get(cell_value, None)
-                
                 html_table += "<td>"
                 if assigned_user:
-                    # 사람이 있는 경우: 전용 컬러 뱃지로 정중앙 표시
                     style_class = "name-leader" if "팀장" in assigned_user else "name-member"
                     html_table += f"""
                     <div class='seat-slot-assigned'>
@@ -226,12 +242,9 @@ with pc_right:
                     </div>
                     """
                 else:
-                    # 사람이 아직 없는 경우: 연한 폰트로 좌석 기호만 중앙 표시
                     html_table += f"<span style='color: #BCBCBC; font-size: 1.1rem;'>{cell_value}</span>"
                 html_table += "</td>"
         html_table += "</tr>"
     
     html_table += "</table>"
-    
-    # 생성된 동적 HTML 테이블 마운트
     st.markdown(html_table, unsafe_allow_html=True)

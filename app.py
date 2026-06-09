@@ -10,10 +10,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 캡처 이미지 서식(통로/검은색 박스 구별)을 완벽 구현하는 CSS 주입
+# 2. 엑셀 도면 구조(통로/검은색 박스)를 칼같이 복원하는 CSS 주입
 st.markdown("""
     <style>
-    /* 상단 타이틀 메뉴 바 잘림 방지 및 전체 레이아웃 패딩 최적화 */
+    /* 상단 메뉴바 잘림 방지 및 전체 레이아웃 패딩 최적화 */
     .block-container {
         padding-top: 4.5rem !important;
         padding-bottom: 1.5rem !important;
@@ -72,8 +72,7 @@ st.markdown("""
         }
         [data-testid="stHorizontalBlock"] > div:first-child [data-testid="stHorizontalBlock"] > div {
             flex: 0 0 calc(25% - 5px) !important;
-            min-width: calc(25% - 5px) !important;
-            max-width: calc(25% - 5px) !important;
+            min-width: calc(25% - 5px) !important;max-width: calc(25% - 5px) !important;
             padding: 0 !important;
         }
         div.stButton > button {
@@ -106,14 +105,14 @@ st.markdown("""
         background-color: #F8F9FA;
     }
     
-    /* 💡 [요구사항 구현] 테두리가 명확하게 둘러싸인 검은색 셀 박스 (기둥/구조물) */
+    /* 💡 테두리가 선명하게 둘러싸인 검은색 구조물 셀 박스 */
     .black-pillar-space {
-        border: 1px solid #475569 !important; /* 명확한 사각형 테두리 보장 */
-        background-color: #1E293B !important; /* 캡처와 유사한 딥 다크 블랙/네이비 색상 */
+        border: 1px solid #475569 !important;
+        background-color: #1E293B !important;
         border-radius: 8px;
     }
     
-    /* 💡 [요구사항 구현] 테두리가 아예 없는 투명한 가로/세로 통로 영역 */
+    /* 💡 테두리가 아예 없는 투명한 가로/세로 통로 영역 */
     .empty-row-space { border: none !important; background-color: transparent !important; }
     .empty-space { border: none !important; background-color: transparent !important; }
     
@@ -160,20 +159,23 @@ def load_initial_members():
     return ["김광녕(팀장)", "김형정", "김홍석", "남광봉", "박명식", "설동민", "원상호", "유정욱", "이병동", 
             "이홍범", "임정빈", "정성영", "정현철", "조관진", "최주용", "한승엽", "홍성화", "이명주"]
 
-# 4. 좌석배치.xlsx 구조 분석 및 A~S 가용 좌석만 정밀 추출하는 함수
+# 4. 💡 [구조 혁신] 공백 행 유실을 철저하게 방어하며 A~S만 추출하는 분석 엔진
 def load_excel_layout():
     file_name = "좌석배치.xlsx"
     if os.path.exists(file_name):
         try:
+            # 빈 행을 누락하지 않기 위해 판다스 엔진의 한계를 보완하여 로드
             df = pd.read_excel(file_name, header=None)
             df = df.fillna("")
             df = df.map(lambda x: str(x).strip()) if hasattr(df, 'map') else df.applymap(lambda x: str(x).strip())
             
-            # 정확하게 가용 좌석 리스트 풀(Pool) 수집 (A~S 규격 필터)
+            # 정확하게 매핑될 가용 좌석 리스트 풀(Pool) 수집 (A~S 규격 필터)
             seats = []
+            valid_seat_letters = [chr(i) for i in range(65, 84)] # A(65)부터 S(83)까지 지정
+            
             for row in df.values:
                 for val in row:
-                    if val != "" and val not in ["0", "0.0", "X", "x", "기둥", "막힘"]:
+                    if val in valid_seat_letters:
                         seats.append(val)
             return df, seats
         except Exception as e:
@@ -246,27 +248,30 @@ with left_col:
 with right_col:
     st.markdown("<div class='section-title'>🪑 좌석 별 배치</div>", unsafe_allow_html=True)
     
+    # 각 열(Column) 단위 분석을 통해 통로 열(4번째 열처럼 전체가 빈 열)을 판별합니다.
+    total_cols = len(layout_df.columns)
+    is_empty_col = [all(layout_df.iloc[r, c] == "" for r in range(len(layout_df))) for c in range(total_cols)]
+    
     html_table = "<table class='seat-table'>"
-    black_cell_keywords = ["0", "0.0", "X", "x", "기둥", "막힘"]
     
     for r_idx, row in layout_df.iterrows():
-        # 해당 행 전체가 통째로 비어있는 세로 통로 구역인지 판별
+        # 행 전체가 통째로 비어있는 가로 통로 줄인지 판별
         is_empty_row = all(cell_value == "" for cell_value in row)
         
         html_table += "<tr>"
         for c_idx, cell_value in enumerate(row):
             if is_empty_row:
-                # 1. 행 전체가 빈 칸인 경우 테두리 없는 투명 통로 처리
-                html_table += f"<td class='empty-row-space' colspan='{len(row)}'></td>"
+                # 1. 가로 통로 유도: 행 전체가 빈 칸인 경우 테두리 없는 투명 통로 처리
+                html_table += f"<td class='empty-row-space' colspan='{total_cols}'></td>"
                 break
+            elif is_empty_col[c_idx]:
+                # 2. 세로 통로 유도: 엑셀상 가로 세로가 만나는 통로 축(4번째 열 등) 테두리 없이 투명하게 유지
+                html_table += "<td class='empty-space'></td>"
             elif cell_value == "":
-                # 2. 💡 [핵심 사양 반영]: 일반 좌석 행 내부에 존재하는 빈 셀은 '테두리가 있는 검은색 박스'로 표현
-                html_table += "<td class='black-pillar-space'></td>"
-            elif cell_value in black_cell_keywords:
-                # 엑셀 데이터상 명시적 구조물 기호가 적힌 셀도 검은색 사각형 박스로 처리
+                # 3. 💡 [도면 복원 핵심]: 통로 축이 아닌데 셀이 비어있다면 테두리가 선명한 '검은색 박스 구조물' 처리
                 html_table += "<td class='black-pillar-space'></td>"
             else:
-                # 3. 유효한 정상 배정 대상 좌석 슬롯 (A ~ S)
+                # 4. 정상 배정 대상 좌석 슬롯 (A ~ S)
                 assigned_user = st.session_state.assignments.get(cell_value, None)
                 html_table += "<td>"
                 if assigned_user:
